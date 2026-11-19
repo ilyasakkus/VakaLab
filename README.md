@@ -1,5 +1,11 @@
 # VakaLab
 
+**19 Kasım 2026 — Öğrenci kaydı ve öğrenci olarak vaka denemesi:** Giriş ekranındaki **Hesap oluştur** ile öğrenci numarası, ad, soyad ve en az 12 karakterlik şifreyle kayıt yapılabilir. Baştaki sıfırlar kaldırılır; aynı numara tekrar kaydedilemez. Yeni öğrenciler ilk etkin araştırmacının Kullanıcılar listesine eklenir; vakalar mevcut atama ekranından atanır. Birden fazla çalışma alanında hedefi `registration_owner_id` ile, Docker/Coolify'da `REGISTRATION_OWNER_ID` ortam değişkeniyle belirleyebilirsiniz (araştırmacının kullanıcı ID'si).
+
+**Kullanıcılar → Şifre sıfırla** yalnız araştırmacının kendi öğrencilerinde kullanılabilir; yeni şifre eski şifreyi ve açık öğrenci oturumlarını geçersiz kılar. **Vakalar ve atamalar → Öğrenci olarak Gör** yeni sekmede gerçek öğrenci çalışma akışını açar. Taslak/kapalı vakalar da ayrı bir test kopyasında denenebilir; başlangıç, AI sohbeti ve son teslim çalışır. Önizleme yanıtları öğrenci listelerine, atamalara ve araştırma dışa aktarımlarına girmez. **Yönetim paneline dön** ile çıkılır. Şema değişikliği gerekmez; güncellemeden önceki oturumlar yeniden giriş ister.
+
+Bu değişikliğin istemci kontrolleri `node tests/auth-preview-ui.cjs`; PHP/SQLite alan kontrolleri `php tests/auth-preview.php` ile çalıştırılır. PHP kontrolleri bu geliştirme ortamında PHP bulunmadığı için çalıştırılamadı.
+
 **23 Ekim 2026 gerçek AI yerel denemesi:** OpenRouter/GPT-5 Nano sentetik sohbet, profil ve tek soru puanlama bağlantısı doğrulandı. Destekleyen modeller için `ai.structured_outputs=true` ve yerel `ai.timeout=90` kullanıldı. Bu denemede eklenen JSON şeması/yorum korumaları henüz GitHub'a gönderilmedi. Tam UI/gerçek rubrik/hosting kabulü bekliyor; ayrıntılar TEST_RESULTS.md.
 
 **GitHub teslimi · 23 Ekim 2026:** Aşağıdaki yerel hazırlık değişiklikleri, PHP güvenlik/8.4.27 kanıtları ve eski teslim düzeltmesi `ee31172` commit'iyle `origin/main` dalına gönderildi. Önceki “henüz commit/push edilmedi” kayıtları teslim öncesi durumu anlatır. Hosting dağıtımı yapılmadı; gerçek AI/hosting/kurum kabulü açık.

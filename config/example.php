@@ -5,6 +5,7 @@ return [
     'db_user' => 'vakalab', 'db_password' => '',
     'base_path' => '', // e.g. /vakalab, no trailing slash
     'timezone' => 'Europe/Istanbul', 'https' => true,
+    'registration_owner_id' => '', // Empty: first active researcher; set ID to route new student registrations to a specific workspace.
     'ai' => ['provider'=>'mock', 'model'=>'synthetic-v1', 'mode'=>'normal',
         'endpoint'=>'https://api.openai.com/v1/chat/completions', 'key'=>'', 'timeout'=>45,
         'structured_outputs'=>false], // Enable only for providers/models supporting strict JSON Schema.

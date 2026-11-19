@@ -28,6 +28,10 @@ final class Admin {
         Auth::researcher($u);$db=$this->app->db;$reason=trim($p['reason']??'');if(in_array($op,['new_attempt','labels','note','exclude','resolve_request','resolve_analysis'],true))demand($reason!=='','İşlem gerekçesi gerekli');
         return $db->tx(function()use($db,$u,$op,$p,$reason){$id=$p['id']??uid();
             switch($op){
+            case 'reset_password':
+                $student=Scope::owned($db,$u,'users',$id);demand($student['role']==='student','Yalnız öğrenci şifresi sıfırlanabilir',403);
+                demand(is_string($p['password']??null),'Yeni şifre gerekli');Auth::validatePassword($p['password']);
+                $db->q('UPDATE users SET password=? WHERE id=?',[password_hash($p['password'],PASSWORD_DEFAULT),$id]);break;
             case 'new_attempt':
                 $previous=Scope::application($db,$u,$p['app_id']);
                 $assignment=$db->one('SELECT * FROM assignments WHERE user_id=? AND case_id=?'.($db->sqlite()?'':' FOR UPDATE'),[$previous['user_id'],$previous['case_id']]);
@@ -46,7 +50,7 @@ final class Admin {
             case 'participant':
                 $old=$db->one('SELECT * FROM users WHERE id=?',[$id]);if($old)Scope::owned($db,$u,'users',$id);$role=$old['role']??($p['role']??'student');demand(in_array($role,['student','researcher'],true),'Hesap türü geçersiz');
                 $login=trim($p['login']??'');demand($login!==''&&strlen($login)<=100,'Öğrenci numarası gerekli');$status=$p['status']??'active';demand(in_array($status,['active','frozen','archived'],true),'Hesap durumu geçersiz');
-                $meta=array_replace($old?obj($old['metadata']):[],$p['metadata']??[]);demand(is_array($meta),'Profil bilgisi geçersiz');$pass=$p['password']??'';demand(($old&&$pass==='')||strlen($pass)>=12,'Parola en az 12 karakter olmalı');
+                $meta=array_replace($old?obj($old['metadata']):[],$p['metadata']??[]);demand(is_array($meta),'Profil bilgisi geçersiz');$pass=$p['password']??'';if(!$old||$pass!=='')Auth::validatePassword($pass);
                 $hash=$pass!==''?password_hash($pass,PASSWORD_DEFAULT):$old['password'];
                 if($old)$db->q('UPDATE users SET login=?,name=?,password=?,status=?,metadata=? WHERE id=?',[$login,$p['name']??'',$hash,$status,js($meta),$id]);
                 else $db->insert('users',['id'=>$id,'login'=>$login,'name'=>$p['name']??'','password'=>$hash,'role'=>$role,'owner_id'=>$u['id'],'status'=>$status,'metadata'=>js($meta),'test'=>$this->app->config['env']==='test'?1:0,'created_at'=>now()]);break;

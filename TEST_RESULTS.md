@@ -1,5 +1,12 @@
 # Gerçek test sonuçları — 2026-10-20
 
+## Öğrenci kaydı ve önizleme — 2026-11-19
+
+- `node tests/auth-preview-ui.cjs`: **17 kontrol geçti**. DOM/API test ikizleriyle form geçişleri, numara normalizasyonu, çift gönderim engeli, hata sonrası alanların korunması, kayıt sonrası oturum bilgisi, şifre tekrarı, önizleme sekmesi/tokenı ve çıkış telemetrisi kontrol edildi. Gerçek tarayıcı veya PHP çalışması değildir.
+- Mevcut `labels.cjs`, `analysis-progress.cjs`, `analysis-observer.cjs`, `time.cjs`, `process-data.cjs`, `review-v2.cjs`: geçti. Değişen JS dosyalarının `node --check` ve `git diff --check` kontrolleri geçti.
+- `tests/auth-preview.php`: kayıt, duplicate/legacy numara, parola kuralları, rol/çalışma alanı sınırları, sıfırlama sonrası oturum iptali, taslak vaka önizlemesi, AI/teslim, gerçek kayıt ve tüm dışa aktarımların korunması için PHP/SQLite testi eklendi; **çalıştırılmadı**. Makinede PHP yok. Mevcut `api-runtime.cjs` de eksik PHP çalıştırılabilir dosyası nedeniyle başlayamadı.
+- Yerel Chrome süreci bu ortamda başlatılamadı; görsel/tarayıcı ve gerçek HTTP/MySQL kabulü yapılmadı. Yayın/deploy yapılmadı.
+
 ## İnceleme düzeltmeleri ve kapsamlı regresyon 0.3.2 — 2026-10-26
 
 - Beş bulgu düzeltildi: öğrenci yanıtlarında özel araştırmacı gerekçesi, ağ belirsizliği sonrası değişen mesajın kaybı, yeniden denemede vaka karışması, eski v2 raporun yeniden yayını ve kodlanmış etiket geçmişindeki serbest tanım metinleri.

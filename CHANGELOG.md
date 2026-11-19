@@ -1,5 +1,13 @@
 # Değişiklik günlüğü
 
+## 2026-11-19 — Öğrenci kaydı, şifre sıfırlama ve tam öğrenci önizlemesi
+
+Giriş ekranına öğrenci numarası, ad, soyad ve şifreyle hesap oluşturma eklendi. Öğrenci numarası metin olarak tutulur, baştaki sıfırlar kaldırılır; mükerrer numara, geçersiz alanlar ve aşırı kayıt denemeleri reddedilir. Kayıt yalnız öğrenci rolü üretir; öğrenciler yapılandırılan veya ilk etkin araştırmacıya bağlanır. CSRF ve oturum kimliği kayıt sonrası yenilenir.
+
+Kullanıcılar listesinde araştırmacının kendi öğrencileri için ayrı Şifre sıfırla işlemi vardır. Şifreler doğrulanır ve hash olarak saklanır; parola değişince mevcut oturumlar geçersiz olur. Eski metin diyaloğunun yerini Öğrenci olarak Gör aldı: ayrı test çalışma alanında normal öğrenci ekranı, başlangıç kilidi, kayıt, AI sohbeti ve teslim kullanılır. Araştırmacı oturumu korunur; önizleme başka öğrenciye veya yönetim işlemlerine erişemez. Test kopyaları araştırma kapsamındaki liste ve dışa aktarımlardan ayrıdır. Yeni migration gerektirmez.
+
+Doğrulama: 17 istemci iş akışı kontrolü ve ilgili mevcut JavaScript kontrolleri geçti. PHP/SQLite alan testleri eklendi; bu geliştirme makinesinde PHP çalıştırılabilir dosyası bulunmadığı için çalıştırılamadı.
+
 ## 0.3.2 — 2026-10-26 — İnceleme düzeltmeleri ve sekme/süre doğrulaması
 
 Öğrenciye dönen başlangıç, kayıt, başlangıç kesinleştirme ve teslim yanıtları aynı izin listesinden geçer; özel analiz dışı bırakma gerekçesi ve araştırmacı alanları gönderilmez. Ağ belirsizliğinde sohbet istek kimliği gönderilen metinle birlikte korunur; değişen mesaj yeni kimlik alır, sunucu aynı kimliğin farklı metinle kullanımını 409 ile reddeder. Başarısız sohbeti yeniden denemenin geç yanıtı başka vakanın mesaj veya bekleme durumunu değiştirmez; açık vakadaki yeniden deneme yanıt gelişi de süre çizelgesine kaydedilir.

@@ -39,6 +39,7 @@ $config = [
     'base_path' => $basePath,
     'timezone' => 'Europe/Istanbul',
     'https' => $https,
+    'registration_owner_id' => trim(getenv('REGISTRATION_OWNER_ID') ?: ''),
     'ai' => [
         'provider' => $aiProvider,
         'model' => $aiModel,
