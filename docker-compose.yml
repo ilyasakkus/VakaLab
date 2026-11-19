@@ -1,0 +1,47 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vakalab_app
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: vakalab_test
+      DB_USER: vakalab
+      DB_PASSWORD: vakalab_password
+      APP_ENV: test
+      APP_HTTPS: "false"
+      VAKALAB_ADMIN_PASSWORD: "AdminGucluSifre2026!"
+      VAKALAB_SEED_PASSWORD: "SeedGucluSifre2026!"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - storage_data:/var/www/html/storage
+
+  mysql:
+    image: mysql:8.0
+    container_name: vakalab_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: vakalab_test
+      MYSQL_USER: vakalab
+      MYSQL_PASSWORD: vakalab_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mysql_data:
+  storage_data:

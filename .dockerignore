@@ -1,0 +1,13 @@
+.git
+.github
+.gitignore
+.dockerignore
+docker-compose*.yml
+.tools/
+tests/tmp/
+test-evidence/
+*.sqlite
+*.log
+.DS_Store
+storage/releases/*.zip
+config/local.php
