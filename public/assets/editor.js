@@ -1,103 +1,108 @@
 'use strict';
-// VakaLab's dependency-free Markdown editor. No service, license key or CDN.
+// Quill 2.0.3 adapter. Plain answers remain the source for scoring and AI;
+// a validated Delta preserves visual formatting alongside each answer.
 (function(root){
-    const escape=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const modes=new Map();
-    const controllers=new WeakMap();
-    const prefixes={heading:/^\s{0,3}#{1,6}\s+/,bullet:/^\s*[-*+]\s+/,number:/^\s*\d+[.)]\s+/,quote:/^\s{0,3}>\s+/};
-    const anyPrefix=/^\s{0,3}(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s+)/;
-    function format(value,start,end,command){
-        start=Math.max(0,Math.min(start,value.length));end=Math.max(start,Math.min(end,value.length));
-        const unchanged=()=>({value,start,end});
-        if(!value.trim())return unchanged();
-        if(command==='bold'||command==='italic'){
-            if(start===end){while(start>0&&!/\s/.test(value[start-1]))start--;while(end<value.length&&!/\s/.test(value[end]))end++;}
-            if(start===end)return unchanged();
-            const mark=command==='bold'?'**':'*',length=mark.length,text=value.slice(start,end);
-            if(start>=length&&value.slice(start-length,start)===mark&&value.slice(end,end+length)===mark)return {value:value.slice(0,start-length)+text+value.slice(end+length),start:start-length,end:end-length};
-            if(text.startsWith(mark)&&text.endsWith(mark)&&text.length>length*2)return {value:value.slice(0,start)+text.slice(length,-length)+value.slice(end),start,end:end-length*2};
-            return {value:value.slice(0,start)+mark+text+mark+value.slice(end),start:start+length,end:end+length};
+    const fields=['problem','decision','reason','final_decision','final_reason','reflection','question'];
+    const formats=['bold','italic','underline','strike','header','size','font','color','background','list','indent','align','blockquote','link'];
+    const controllers=new WeakMap(),mounted=new Set();
+    const escape=text=>String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function validAttribute(key,value){
+        if(['bold','italic','underline','strike','blockquote'].includes(key))return value===true;
+        if(key==='header')return Number.isInteger(value)&&value>=1&&value<=3;
+        if(key==='indent')return Number.isInteger(value)&&value>=1&&value<=8;
+        if(key==='size')return ['small','large','huge'].includes(value);
+        if(key==='font')return ['serif','monospace'].includes(value);
+        if(key==='list')return ['ordered','bullet','checked','unchecked'].includes(value);
+        if(key==='align')return ['center','right','justify'].includes(value);
+        if(key==='color'||key==='background')return typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+        if(key==='link')return typeof value==='string'&&value.length<=2000&&/^(?:https?:\/\/|mailto:)[^\s<>"\x00-\x1f]+$/i.test(value);
+        return false;
+    }
+    function plainText(delta){return delta.ops.map(op=>op.insert).join('').slice(0,-1);}
+    function fromText(text){return {ops:[{insert:String(text)+'\n'}]};}
+    function normalize(delta,expected){
+        if(!delta||!Array.isArray(delta.ops)||!delta.ops.length||delta.ops.length>2000)throw new Error('Editör içeriği geçersiz veya çok uzun.');
+        const ops=delta.ops.map(op=>{
+            if(!op||typeof op.insert!=='string'||!op.insert||Object.keys(op).some(key=>!['insert','attributes'].includes(key)))throw new Error('Editörde yalnız metin kullanılabilir.');
+            const out={insert:op.insert},attributes={};
+            if(op.attributes&&Object.keys(op.attributes).some(key=>!formats.includes(key)))throw new Error('Editör biçimi geçersiz.');
+            for(const key of formats){if(!Object.hasOwn(op.attributes||{},key))continue;const value=op.attributes[key];if(!validAttribute(key,value))throw new Error('Editör biçim değeri geçersiz.');attributes[key]=value;}
+            if(Object.keys(attributes).length)out.attributes=attributes;return out;
+        });
+        const doc={ops},text=ops.map(op=>op.insert).join('');
+        if(!text.endsWith('\n')||(expected!==undefined&&text.slice(0,-1)!==expected))throw new Error('Editör metni ile yanıt uyuşmuyor.');
+        if(new TextEncoder().encode(text).length>60001)throw new Error('Metin sınırı aşıldı.');
+        return doc;
+    }
+    function render(delta){
+        let doc;try{doc=normalize(delta);}catch{return '';}
+        const lines=[];let fragments=[];
+        for(const op of doc.ops){const attrs=op.attributes||{},parts=op.insert.split('\n');
+            for(let i=0;i<parts.length;i++){
+                if(parts[i]){let html=escape(parts[i]);if(attrs.bold)html='<strong>'+html+'</strong>';if(attrs.italic)html='<em>'+html+'</em>';if(attrs.underline)html='<u>'+html+'</u>';if(attrs.strike)html='<s>'+html+'</s>';if(attrs.link)html='<a href="'+escape(attrs.link)+'" target="_blank" rel="noopener noreferrer">'+html+'</a>';fragments.push(html);}
+                if(i<parts.length-1){lines.push({html:fragments.join('')||'<br>',attrs});fragments=[];}
+            }
         }
-        if(!prefixes[command]&&command!=='clear')return unchanged();
-        const from=start===0?0:value.lastIndexOf('\n',start-1)+1;
-        const last=end>start&&value[end-1]==='\n'?end-1:end;
-        const found=value.indexOf('\n',last),to=found<0?value.length:found;
-        const lines=value.slice(from,to).split('\n'),remove=prefixes[command]&&lines.filter(line=>line.trim()).every(line=>prefixes[command].test(line));
-        let number=0;
-        const replacement=lines.map(line=>{
-            if(!line.trim())return line;
-            if(command==='clear')return line.replace(anyPrefix,'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1');
-            if(remove)return line.replace(prefixes[command],'');
-            const text=line.replace(anyPrefix,'');number++;
-            return ({heading:'## ',bullet:'- ',number:number+'. ',quote:'> '}[command])+text;
-        }).join('\n');
-        return {value:value.slice(0,from)+replacement+value.slice(to),start:from,end:from+replacement.length};
+        const out=[];let list='';const close=()=>{if(list){out.push('</'+list+'>');list='';}};
+        for(const line of lines){if(line.attrs.list){const tag=line.attrs.list==='ordered'?'ol':'ul';if(list!==tag){close();list=tag;out.push('<'+tag+'>');}out.push('<li>'+line.html+'</li>');}else{close();const tag=line.attrs.header?'h'+Math.min(6,line.attrs.header+2):line.attrs.blockquote?'blockquote':'p';out.push('<'+tag+'>'+line.html+'</'+tag+'>');}}
+        close();return out.join('');
     }
-    function inline(text){return escape(text).replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>');}
-    function render(value){
-        const lines=String(value).replace(/\r\n?/g,'\n').split('\n'),out=[];let list='',paragraph=[];
-        const closeParagraph=()=>{if(paragraph.length){out.push('<p>'+paragraph.map(inline).join('<br>')+'</p>');paragraph=[];}};
-        const closeList=()=>{if(list){out.push('</'+list+'>');list='';}};
-        for(const line of lines){
-            if(!line.trim()){closeParagraph();closeList();continue;}
-            const heading=line.match(/^\s{0,3}(#{1,6})\s+(.+)$/),quote=line.match(/^\s{0,3}>\s+(.+)$/),bullet=line.match(/^\s*[-*+]\s+(.+)$/),number=line.match(/^\s*\d+[.)]\s+(.+)$/);
-            if(heading||quote){closeParagraph();closeList();if(heading){const level=heading[1].length===1?3:4;out.push('<h'+level+'>'+inline(heading[2])+'</h'+level+'>');}else out.push('<blockquote>'+inline(quote[1])+'</blockquote>');}
-            else if(bullet||number){closeParagraph();const tag=bullet?'ul':'ol';if(list!==tag){closeList();out.push('<'+tag+'>');list=tag;}out.push('<li>'+inline((bullet||number)[1])+'</li>');}
-            else{closeList();paragraph.push(line);}
+    function toolbar(doc){
+        const bar=doc.createElement('div');bar.className='rich-toolbar';bar.setAttribute('role','group');bar.setAttribute('aria-label','Metin biçimlendirme araçları');
+        const group=()=>{const span=doc.createElement('span');span.className='ql-formats';bar.append(span);return span;};
+        const button=(parent,name,label,value)=>{const el=doc.createElement('button');el.type='button';el.className='ql-'+name;if(value!==undefined)el.value=value;el.title=label;el.setAttribute('aria-label',label);parent.append(el);return el;};
+        const select=(parent,name,label,options)=>{const el=doc.createElement('select');el.className='ql-'+name;el.title=label;el.setAttribute('aria-label',label);for(const [value,text] of options){const option=doc.createElement('option');option.value=value;option.textContent=text;if(value==='')option.setAttribute('selected','selected');el.append(option);}parent.append(el);return el;};
+        let part=group();button(part,'undo','Geri al');button(part,'redo','Yinele');
+        part=group();select(part,'font','Yazı tipi',[['','Varsayılan'],['serif','Serif'],['monospace','Eş aralıklı']]);select(part,'header','Paragraf biçimi',[['','Normal metin'],['1','Başlık 1'],['2','Başlık 2'],['3','Başlık 3']]);select(part,'size','Yazı boyutu',[['small','Küçük'],['','Normal'],['large','Büyük'],['huge','Çok büyük']]);
+        part=group();for(const [key,label] of [['bold','Kalın'],['italic','İtalik'],['underline','Altı çizili'],['strike','Üstü çizili']])button(part,key,label);
+        part=group();select(part,'color','Yazı rengi',[]);select(part,'background','Vurgu rengi',[]);
+        part=group();button(part,'list','Numaralı liste','ordered');button(part,'list','Madde işaretli liste','bullet');button(part,'indent','Girintiyi azalt','-1');button(part,'indent','Girintiyi artır','+1');
+        part=group();select(part,'align','Metni hizala',[['','Sola hizala'],['center','Ortala'],['right','Sağa hizala'],['justify','İki yana yasla']]);button(part,'blockquote','Alıntı');button(part,'link','Bağlantı ekle');button(part,'clean','Biçimlendirmeyi temizle');
+        return bar;
+    }
+    function mount(textarea,options={}){
+        if(controllers.has(textarea))return controllers.get(textarea).quill;
+        if(typeof root.Quill!=='function')return null;
+        const doc=textarea.ownerDocument,wrapper=doc.createElement('div'),host=doc.createElement('div'),footer=doc.createElement('div'),label=doc.querySelector('label[for="'+textarea.id+'"]');
+        wrapper.className='student-rich-editor';wrapper.dataset.editorFor=textarea.id;host.id=textarea.id+'-editor';footer.className='rich-editor-footer';
+        textarea.before(wrapper);wrapper.append(textarea);const bar=textarea.disabled?null:toolbar(doc);if(bar)wrapper.append(bar);wrapper.append(host,footer);
+        const icons=root.Quill.import('ui/icons');icons.undo='<svg viewBox="0 0 18 18"><path class="ql-stroke" d="M5 5H2V2M2 5a7 7 0 1 1 0 8"/></svg>';icons.redo='<svg viewBox="0 0 18 18"><path class="ql-stroke" d="M13 5h3V2m0 3a7 7 0 1 0 0 8"/></svg>';
+        const quill=new root.Quill(host,{theme:'snow',readOnly:textarea.disabled,formats,placeholder:textarea.disabled?'':'Yanıtınızı buraya yazın…',modules:{toolbar:bar?{container:bar,handlers:{undo(){this.quill.history.undo();},redo(){this.quill.history.redo();}}}:false,history:{delay:800,maxStack:100,userOnly:true}}});
+        let initial=fromText(textarea.value);if(options.delta){try{initial=normalize(options.delta,textarea.value);}catch{}}
+        quill.setContents(initial,'silent');quill.history.clear();
+        if(label){label.id=label.id||textarea.id+'-label';quill.root.setAttribute('aria-labelledby',label.id);}
+        quill.root.setAttribute('role','textbox');quill.root.setAttribute('aria-multiline','true');quill.root.setAttribute('aria-readonly',String(textarea.disabled));quill.root.dataset.source=textarea.id;quill.root.dataset.editorField=textarea.id;
+        if(textarea.disabled)quill.root.tabIndex=0;
+        textarea.hidden=true;textarea.classList.add('rich-text-source');textarea.setAttribute('aria-hidden','true');
+        const counter=()=>{footer.textContent=Array.from(quill.getText().slice(0,-1)).length.toLocaleString('tr-TR')+' karakter'+(textarea.disabled?' · Salt okunur':'');};
+        const change=(_delta,_old,source)=>{
+            if(source!=='user'||textarea.disabled)return;
+            const text=quill.getText().slice(0,-1);let delta;
+            try{
+                const raw=quill.getContents();for(const op of raw.ops)if(op.attributes?.link&&!validAttribute('link',op.attributes.link))delete op.attributes.link;
+                delta=normalize(raw,text);
+            }catch(error){options.onError?.(error);delta=null;}
+            textarea.value=text;options.onChange?.(delta);textarea.dispatchEvent(new Event('input',{bubbles:true}));counter();
+        };
+        const focus=()=>textarea.onfocus?.();
+        const focusLabel=event=>{event.preventDefault();if(!textarea.disabled)quill.focus({preventScroll:true});};label?.addEventListener('click',focusLabel);
+        const blur=event=>{if(!wrapper.contains(event.relatedTarget))textarea.onblur?.();};
+        quill.on('text-change',change);quill.root.addEventListener('focus',focus);wrapper.addEventListener('focusout',blur);
+        // Preserve compatibility with plain-text fallbacks and test/import tools.
+        const sync=()=>{if(quill.getText().slice(0,-1)!==textarea.value){quill.setText(textarea.value,'silent');quill.history.clear();counter();}};
+        textarea.addEventListener('input',sync);
+        if(bar){
+            bar.querySelectorAll('.ql-picker').forEach(picker=>{const select=picker.nextElementSibling,caption=select?.getAttribute('aria-label');if(caption){const control=picker.querySelector('.ql-picker-label');control?.setAttribute('aria-label',caption);control?.setAttribute('title',caption);}});
         }
-        closeParagraph();closeList();return out.join('')||'<p class="muted">Henüz metin yazılmadı.</p>';
+        counter();const controller={quill,wrapper,focus(){if(!textarea.disabled)quill.focus({preventScroll:true});},destroy(){quill.off('text-change',change);label?.removeEventListener('click',focusLabel);quill.root.removeEventListener('focus',focus);wrapper.removeEventListener('focusout',blur);textarea.removeEventListener('input',sync);controllers.delete(textarea);mounted.delete(controller);}};
+        controllers.set(textarea,controller);mounted.add(controller);return quill;
     }
-    function history(initial){
-        let past=[],future=[],value=initial;
-        return {
-            record(next){if(next===value)return;past.push(value);if(past.length>50)past.shift();value=next;future=[];},
-            undo(){if(!past.length)return value;future.push(value);value=past.pop();return value;},
-            redo(){if(!future.length)return value;past.push(value);value=future.pop();return value;},
-            get canUndo(){return past.length>0;},get canRedo(){return future.length>0;}
-        };
-    }
-    function mount(textarea){
-        if(textarea.closest('.student-editor'))return;
-        const doc=textarea.ownerDocument,wrapper=doc.createElement('div'),toolbar=doc.createElement('div'),preview=doc.createElement('div'),footer=doc.createElement('div');
-        wrapper.className='student-editor';wrapper.dataset.editorFor=textarea.id;
-        toolbar.className='student-editor-toolbar';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Metin düzenleme araçları');
-        const tools=[['bold','Kalın (Ctrl/Cmd+B)','K'],['italic','İtalik (Ctrl/Cmd+I)','İ'],['heading','Başlık','Başlık'],['bullet','Madde işaretli liste','• Liste'],['number','Numaralı liste','1. Liste'],['quote','Alıntı','❝'],['clear','Biçimlendirmeyi temizle','Temizle'],['undo','Geri al (Ctrl/Cmd+Z)','↶'],['redo','Yinele (Ctrl/Cmd+Shift+Z)','↷']];
-        for(const [command,label,text] of tools){const button=doc.createElement('button');button.type='button';button.dataset.editorCommand=command;button.title=label;button.setAttribute('aria-label',label);button.textContent=text;toolbar.append(button);}
-        const toggle=doc.createElement('button');toggle.type='button';toggle.className='student-editor-toggle';toggle.setAttribute('aria-controls',textarea.id+'-preview');toolbar.append(toggle);
-        preview.id=textarea.id+'-preview';preview.className='student-editor-preview prose';preview.tabIndex=0;
-        preview.dataset.source=textarea.id;
-        preview.setAttribute('role','region');preview.setAttribute('aria-label',(doc.querySelector('label[for="'+textarea.id+'"]')?.textContent||'Yanıt')+' · Önizleme');
-        footer.className='student-editor-footer';const hint=doc.createElement('span'),counter=doc.createElement('span');hint.textContent='Metin seçerek biçimlendirin. Önizleme ile görünümünü kontrol edin.';counter.setAttribute('aria-label','Karakter sayısı');footer.append(hint,counter);
-        textarea.before(wrapper);wrapper.append(toolbar,textarea,preview,footer);
-        const changes=history(textarea.value),readonly=textarea.disabled;let previewing=readonly||(modes.get(textarea.id)??false);
-        const update=()=>{
-            preview.innerHTML=render(textarea.value);counter.textContent=Array.from(textarea.value).length.toLocaleString('tr-TR')+' karakter';
-            textarea.hidden=previewing;preview.hidden=!previewing;toggle.textContent=previewing?'Düzenle':'Önizleme';toggle.setAttribute('aria-pressed',String(previewing));toggle.disabled=readonly;
-            toolbar.querySelectorAll('[data-editor-command]').forEach(button=>{button.disabled=readonly||previewing||(button.dataset.editorCommand==='undo'&&!changes.canUndo)||(button.dataset.editorCommand==='redo'&&!changes.canRedo);});
-        };
-        const replace=(value,start,end,record=true)=>{
-            if(value===textarea.value)return;
-            if(record)changes.record(value);textarea.value=value;textarea.focus({preventScroll:true});textarea.setSelectionRange(start,end);
-            textarea.dispatchEvent(new Event('input',{bubbles:true}));update();
-        };
-        const apply=command=>{
-            if(readonly||previewing)return;
-            if(command==='undo'||command==='redo'){const value=changes[command]();replace(value,value.length,value.length,false);return;}
-            const result=format(textarea.value,textarea.selectionStart,textarea.selectionEnd,command);replace(result.value,result.start,result.end);
-        };
-        toolbar.querySelectorAll('[data-editor-command]').forEach(button=>{button.onpointerdown=e=>e.preventDefault();});
-        toggle.onclick=()=>{previewing=!previewing;modes.set(textarea.id,previewing);update();if(previewing)preview.focus();else textarea.focus();};
-        let applyingHistory=false;
-        // Record ordinary input; programmatic formatting already records its
-        // value, while undo/redo dispatches input to the same autosave handler.
-        textarea.addEventListener('input',()=>{if(!applyingHistory)changes.record(textarea.value);update();});
-        const applyWithHistory=command=>{applyingHistory=command==='undo'||command==='redo';try{apply(command);}finally{applyingHistory=false;}};
-        toolbar.querySelectorAll('[data-editor-command]').forEach(button=>button.onclick=()=>applyWithHistory(button.dataset.editorCommand));
-        textarea.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||readonly)return;const key=e.key.toLowerCase(),command=key==='b'?'bold':key==='i'?'italic':key==='z'?(e.shiftKey?'redo':'undo'):key==='y'?'redo':null;if(command){e.preventDefault();applyWithHistory(command);}});
-        controllers.set(textarea,{focus(){if(readonly)return;previewing=false;modes.set(textarea.id,false);update();textarea.focus({preventScroll:true});}});
-        update();
-    }
-    const editor={format,render,history,mount,focus:textarea=>controllers.get(textarea)?.focus()};
-    if(typeof module!=='undefined'&&module.exports)module.exports=editor;
-    if(root)root.VakaEditor=editor;
+    const editor={fields,formats,normalize,plainText,fromText,render,mount,
+        has:textarea=>controllers.has(textarea),get:textarea=>controllers.get(textarea)?.quill,
+        element:textarea=>controllers.get(textarea)?.quill.root,
+        focus:textarea=>controllers.get(textarea)?.focus(),
+        validation(textarea,invalid,id){const current=controllers.get(textarea);if(!current)return;current.wrapper.classList.toggle('field-invalid',invalid);current.quill.root.setAttribute('aria-invalid',String(invalid));if(invalid)current.quill.root.setAttribute('aria-describedby',id);else current.quill.root.removeAttribute('aria-describedby');},
+        destroyAll(){for(const controller of [...mounted])controller.destroy();}
+    };
+    if(typeof module!=='undefined'&&module.exports)module.exports=editor;if(root)root.VakaEditor=editor;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -1,64 +1,28 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const {format,render,history,mount,focus}=require('../public/assets/editor.js');
+const editor=require('../public/assets/editor.js');
 let checks=0;
-function check(ok,label){assert.ok(ok,label);console.log(`PASS EDITOR ${++checks} ${label}`);}
-
-const bold=format('İlk karar',0,3,'bold');
-check(bold.value==='**İlk** karar'&&bold.start===2&&bold.end===5,'bold preserves Turkish text and selection');
-check(format(bold.value,bold.start,bold.end,'bold').value==='İlk karar','bold toggles off');
-check(format('İlk karar',4,9,'italic').value==='İlk *karar*','italic wraps only selected answer');
-check(format('ilk karar',5,5,'bold').value==='ilk **karar**','collapsed cursor formats its word');
-check(format('',0,0,'bold').value==='','empty answer never gains fabricated placeholder text');
-check(format('   ',0,0,'bullet').value==='   ','empty list action keeps answer empty');
-const numbered=format('Birinci\nİkinci\nÜçüncü',0,14,'number');
-check(numbered.value==='1. Birinci\n2. İkinci\nÜçüncü','numbered list respects selected line boundaries');
-check(format('Bir\nİki',0,7,'bullet').value==='- Bir\n- İki','bullet list supports multiple lines');
-check(format('- Bir\n- İki',0,11,'bullet').value==='Bir\nİki','bullet toggle removes list markers');
-check(format('Karar\nGerekçe',0,0,'heading').value==='## Karar\nGerekçe','heading changes current line');
-check(format('## Karar',0,8,'heading').value==='Karar','heading toggles off');
-check(format('Karar',0,5,'quote').value==='> Karar','quote command formats answer');
-check(format('- **Önemli** *karar*',0,20,'clear').value==='Önemli karar','clear removes editor formatting');
-check(format('x\ny',0,2,'heading').value==='## x\ny','selection ending in newline leaves next line untouched');
-check(format('Yanıt',0,5,'unknown').value==='Yanıt','unknown commands cannot alter content');
-check(render('**Gerekçe** ve *karar*').includes('<strong>Gerekçe</strong> ve <em>karar</em>'),'preview renders bold and italic');
-check(render('## Başlık\n\n- Bir\n- İki').includes('<h4>Başlık</h4><ul><li>Bir</li><li>İki</li></ul>'),'preview renders headings and lists');
-check(render('1. Bir\n2. İki\n\n> Alıntı').includes('<ol><li>Bir</li><li>İki</li></ol><blockquote>Alıntı</blockquote>'),'preview closes list before quote');
-const hostile=render('## <img src=x onerror=alert(1)>\n\n<script>alert(1)</script>\n**<svg onload=alert(2)>**');
-check(!/<(?:img|script|svg)\b/.test(hostile)&&hostile.includes('&lt;script&gt;'),'preview escapes executable HTML, including formatted headings');
-check(render('[tıkla](javascript:alert(1))').indexOf('<a')===-1,'preview never creates unsafe links');
-check(render('Bir\r\nİki').includes('Bir<br>İki'),'preview preserves line breaks');
-check(render('  ').includes('Henüz metin yazılmadı'),'empty preview is distinguishable from an answer');
-const undo=history('');undo.record('Bir');undo.record('**Bir**');
-check(undo.canUndo&&undo.undo()==='Bir','undo restores answer before formatting');
-check(undo.redo()==='**Bir**'&&!undo.canRedo,'redo restores formatting');
-undo.undo();undo.record('Yeni');check(!undo.canRedo&&undo.undo()==='Bir','new input after undo discards stale redo branch');
-for(let i=0;i<70;i++)undo.record(String(i));for(let i=0;i<50;i++)undo.undo();check(!undo.canUndo,'editor history has a bounded memory footprint');
-
-// Exercise the mounted editor's autosave contract without a browser service.
-class Element {
-    constructor(tag,doc){this.tagName=tag;this.ownerDocument=doc;this.children=[];this.dataset={};this.attributes={};this.listeners={};this.value='';this.disabled=false;this.className='';this.selectionStart=0;this.selectionEnd=0;}
-    setAttribute(k,v){this.attributes[k]=v;}
-    append(...nodes){for(const node of nodes){if(node.parentElement)node.parentElement.children=node.parentElement.children.filter(child=>child!==node);node.parentElement=this;this.children.push(node);}}
-    before(node){const parent=this.parentElement;node.parentElement=parent;parent.children.splice(parent.children.indexOf(this),0,node);}
-    closest(selector){let node=this;while(node){if(selector==='.'+node.className)return node;node=node.parentElement;}return null;}
-    querySelectorAll(){const result=[];for(const child of this.children){if(child.dataset.editorCommand)result.push(child);result.push(...child.querySelectorAll());}return result;}
-    addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
-    dispatchEvent(event){this['on'+event.type]?.(event);for(const fn of this.listeners[event.type]||[])fn(event);}
-    setSelectionRange(start,end){this.selectionStart=start;this.selectionEnd=end;}
-    focus(){this.ownerDocument.activeElement=this;}
-}
-const doc={createElement:tag=>new Element(tag,doc),querySelector:()=>({textContent:'Kararınız'})};
-const host=new Element('div',doc),area=new Element('textarea',doc);area.id='decision';area.value='İlk karar';area.selectionEnd=3;host.append(area);let autosaves=0;area.oninput=()=>autosaves++;
-mount(area);const wrapper=host.children[0],toolbar=wrapper.children[0],tool=command=>toolbar.querySelectorAll().find(button=>button.dataset.editorCommand===command),toggle=toolbar.children.at(-1);
-mount(area);check(host.children.length===1&&wrapper.children.includes(area),'mount retains original textarea and cannot duplicate editor');
-tool('bold').onclick();check(area.value==='**İlk** karar'&&autosaves===1,'toolbar dispatches input through existing autosave handler');
-tool('undo').onclick();check(area.value==='İlk karar'&&autosaves===2,'mounted undo updates draft through same input event');
-tool('redo').onclick();check(area.value==='**İlk** karar'&&autosaves===3,'mounted redo survives input listener without corrupting history');
-toggle.onclick();check(area.hidden&&tool('bold').disabled&&wrapper.children[2].innerHTML.includes('<strong>İlk</strong>'),'preview shows safe formatting and disables editing controls');
-focus(area);check(!area.hidden&&doc.activeElement===area,'required-field navigation can reveal textarea from preview mode');
-const readonly=new Element('textarea',doc);readonly.id='locked-problem';readonly.value='**Kilitli** yanıt';readonly.disabled=true;host.append(readonly);mount(readonly);const lockedTool=readonly.parentElement.children[0].querySelectorAll().find(button=>button.dataset.editorCommand==='bold');lockedTool.onclick();
-check(lockedTool.disabled&&readonly.value==='**Kilitli** yanıt'&&readonly.hidden,'readonly answers cannot be modified by toolbar actions');
-
+function check(ok,label){assert.ok(ok,label);console.log(`PASS RICH EDITOR ${++checks} ${label}`);}
+function rejected(fn,label){assert.throws(fn);check(true,label);}
+const text='İlk karar\nGerekçe';
+const doc={ops:[{insert:'İlk',attributes:{bold:true}},{insert:' karar\nGerekçe\n'}]};
+check(editor.plainText(editor.normalize(doc,text))===text,'formatted Turkish answer remains exact plain text');
+check(editor.plainText(editor.fromText('Yanıt\n'))==='Yanıt\n','user newline is distinct from Quill terminal newline');
+check(editor.plainText(editor.fromText(''))==='','empty editor remains an empty required field');
+check(editor.render(doc).includes('<strong>İlk</strong> karar'),'safe projection renders actual formatting');
+check(editor.normalize({ops:[{insert:'Yanıt',attributes:{italic:true,bold:true}},{insert:'\n'}]}).ops[0].attributes.bold,'inline attributes normalized');
+for(const [key,value] of Object.entries({underline:true,strike:true,header:2,size:'large',font:'serif',color:'#aabbcc',background:'#ffeeaa',list:'ordered',indent:2,align:'justify',blockquote:true,link:'https://example.org'}))check(!!editor.normalize({ops:[{insert:'Metin\n',attributes:{[key]:value}}]}),key+' format accepted');
+rejected(()=>editor.normalize({ops:[{insert:{image:'https://example.org/image.png'}}]}),'image/embed cannot enter answer data');
+rejected(()=>editor.normalize({ops:[{retain:1,attributes:{bold:true}}]}),'change deltas cannot masquerade as whole documents');
+rejected(()=>editor.normalize({ops:[{insert:'wrong\n'}]},'expected'),'plain answer and formatting must match');
+rejected(()=>editor.normalize({ops:[{insert:'missing terminator'}]}),'document requires terminal newline');
+rejected(()=>editor.normalize({ops:[{insert:'x\n',attributes:{link:'javascript:alert(1)'}}]}),'executable link is rejected');
+rejected(()=>editor.normalize({ops:[{insert:'x\n',attributes:{color:'red;position:fixed'}}]}),'arbitrary CSS is rejected');
+rejected(()=>editor.normalize({ops:[{insert:'x\n',attributes:{onclick:'alert(1)'}}]}),'unknown event/HTML attributes rejected');
+rejected(()=>editor.normalize({ops:[{insert:'x\n',attributes:{header:99}}]}),'invalid heading rejected');
+rejected(()=>editor.normalize({ops:[{insert:'x\n',attributes:{indent:99}}]}),'invalid indentation rejected');
+rejected(()=>editor.normalize({ops:[{insert:'a'.repeat(60001)+'\n'}]}),'server byte-size bound also enforced by client');
+check(editor.render(editor.fromText('<img src=x onerror=alert(1)>')).includes('&lt;img'),'raw HTML displayed as text');
+check(!editor.render({ops:[{insert:'x\n',attributes:{link:'data:text/html,<script>x</script>'}}]}),'unsafe document has no rendered projection');
 const nodes=new Map(),events=[],context=vm.createContext({
     console,URLSearchParams,TextEncoder,structuredClone,
     crypto:{randomUUID:()=> 'test-tab'},sessionStorage:{getItem:()=>null,setItem(){}},
@@ -88,5 +52,5 @@ const run=s=>vm.runInContext(s,context);
     run("dirty=true;save=async()=>{await waitForSave();dirty=false;}");const first=run('advanceWork(1)');await run('advanceWork(1)');completeSave();await first;
     check(run('section')==='profile','rapid arrow clicks cannot skip a step while saving');
     check(events.some(e=>e[0]==='event'&&e[1]==='section_open'),'arrow navigation preserves section timing telemetry');
-    console.log(`TOTAL EDITOR/STEPPER ${checks} checks passed; unit and workflow doubles.`);
+    console.log(`TOTAL RICH EDITOR/STEPPER ${checks} checks passed; unit and workflow doubles.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

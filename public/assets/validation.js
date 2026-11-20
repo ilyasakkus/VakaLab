@@ -39,11 +39,12 @@ function goToRequiredField(key, scope) {
     event('section_open', {reason:'validation', field:key});
     const input = document.getElementById(key);
     if (input) {
-        if (typeof VakaEditor !== 'undefined') VakaEditor.focus(input);
-        input.focus({preventScroll:true});
+        const visible = typeof VakaEditor !== 'undefined' ? VakaEditor.element(input) || input : input;
+        if (visible !== input) VakaEditor.focus(input);
+        else input.focus({preventScroll:true});
         const headerHeight = document.querySelector('.workspace-top')?.getBoundingClientRect().height || 0;
         // Leave the label and field below the sticky navigation, including on mobile.
-        window.scrollTo({top:Math.max(0,window.scrollY + input.getBoundingClientRect().top - headerHeight - 80), behavior:'instant'});
+        window.scrollTo({top:Math.max(0,window.scrollY + visible.getBoundingClientRect().top - headerHeight - 80), behavior:'instant'});
     }
 }
 function validateBeforeConfirm(scope) {
@@ -76,6 +77,7 @@ function updateValidationFeedback() {
             if (message) message.remove();
             input.removeAttribute('aria-describedby');
         }
+        if (typeof VakaEditor !== 'undefined') VakaEditor.validation(input, invalid, id);
     }
     document.querySelectorAll('[data-section]').forEach(button => {
         const count = missing.filter(key => requiredFields[key].section === button.dataset.section).length;

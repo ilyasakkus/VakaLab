@@ -1,5 +1,17 @@
 # Değişiklik günlüğü
 
+## 2026-11-20 — Quill zengin metin editörü
+
+Basit Markdown arayüzü hazır Quill 2.0.3 / Snow paketiyle değiştirildi. Dağıtım dosyaları BSD-3-Clause lisansı ve doğrulama hashleriyle yereldir; CSP gevşetilmedi ve CDN bağımlılığı eklenmedi. Türkçe araç çubuğu yazı tipi/boyutu, kalın/italik/altı çizili/üstü çizili, renk/vurgu, başlık, liste/girinti/hizalama, alıntı ve bağlantı içerir. Quill'in kendi geri alma, klavye, seçim ve yapıştırma mekanizmaları kullanılır.
+
+Görsel belge doğrulanmış Delta olarak `draft.rich_text` alanında saklanır; mevcut düz metin yanıtı AI, rubrik ve rapor kaynakları için korunur. Yeni migration gerekmez. Başlangıç ve teslim kilitleri biçimlendirmeyi de kapsar; snapshot'lar yalnız ilgili aşamanın biçim verisini içerir. Salt okunur yanıtlar biçimli gösterilir. Eksik alan odağı/hatası, kopyalama/yapıştırma telemetrisi, otomatik kayıt ve gönderilmiş sohbet taslağının temizlenmesi görünür editöre uyarlandı. Eski yanıtlar veya Markdown metinleri otomatik dönüştürülmez.
+
+## 2026-11-20 — Sohbette bekleme animasyonu ve son mesajı izleme
+
+Gönderilen soru otomatik kayıt beklenirken dahi yerel sohbet balonu olarak gösterilir; yalnız kayıttan sonra AI isteği başlar. Üç noktalı bekleme göstergesi yanıt, hata ve yeniden deneme durumlarıyla güncellenir. Sunucunun doğruladığı mesaj yerel balonun yerine geçer; ağ belirsizliğinde istek kimliği korunur. Öğrencinin yanıt beklerken hazırladığı yeni mesaj taslağı yeniden oluşturulan bir editör nedeniyle kesilmez.
+
+Sohbet ilk açılışta ve yeni yanıt geldiğinde son mesajı izler. Geçmişi okumak için yukarı kaydırıldığında konum korunur, Son mesaja git düğmesiyle izleme sürdürülür. Konum vaka bazında saklanır; otomatik kaydırma öğrenci scroll telemetrisine eklenmez. Animasyon azaltılmış hareket tercihini destekler. PHP/şema değişikliği yok; arayüz dosya sürümleri yenilendi.
+
 ## 2026-11-20 — Gerçek AI ayarları, yanıt editörü ve adım okları
 
 Sunucu ayarları ortak bir çözümleyiciden geçer. `AI_*` yanında `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` ve `OPENAI_API_URL` desteklenir. Anahtar girilmişken örnek config'in varsayılan mock değeri nedeniyle sentetik modda kalma düzeltildi; ortam değişkeniyle açık mock seçimi korunur. Gerçek sağlayıcıya sentetik model adı gönderilmez; model seçilmediyse ayar hatası verilir. Uygulama ve başlangıç logu anahtarı göstermeden etkin sağlayıcı/modeli belirtir. API hataları mock yanıta düşmez.

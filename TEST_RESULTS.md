@@ -1,5 +1,18 @@
 # Gerçek test sonuçları — 2026-10-20
 
+## Hazır Quill editörü — 2026-11-20
+
+- Gerçek yerel **Quill 2.0.3** dağıtımı ve jsdom 26.1.0 ile `tests/rich-editor-dom.cjs`: **23 kontrol geçti**. Anında WYSIWYG, Türkçe araçlar, biçim değişikliğinin input/autosave'a iletilmesi, gerçek undo/redo, yazı tipi/renk/hizalama, Delta round-trip, görünür alana hata/odak, salt okunur kilit ve zengin yapıştırma kontrol edildi. Taklit editör kullanılmadı; jsdom görsel yerleşim testi değildir.
+- `student-editor.cjs`: yeni Delta/stepper kontrolleri **41**; `chat-ui.cjs`: **44**; `auth-preview-ui.cjs`: **17** kontrol geçti. Toplam **125** JavaScript/DOM kontrolü.
+- PHP dosyaları `php-parser` 3.2.5 ile PHP 8.3 sözdizimi açısından parse edildi. `tests/rich-text.php` veri doğrulama, biçim revizyonu, kilit ve snapshot testleri eklendi. **Gerçek PHP/SQLite çalışma testi yapılamadı**; makinede PHP yok. PHP parse kontrolü runtime testi değildir.
+- Gerçek görsel tarayıcı ve canlı AI kabulü yapılmadı; deploy yapılmadı. Quill JS/CSS/lisans dosyalarının SHA-256 hashleri vendored README'dedir.
+
+## Sohbet bekleme göstergesi ve kaydırma — 2026-11-20
+
+- `node tests/chat-ui.cjs`: **44 kontrol geçti**. Güvenli/anlık öğrenci balonu, üç noktalı loading, kayıt öncesi görünürlük, erken polling, cevap/hata/yeniden deneme, mesaj tekilleştirme, korunmuş taslak ve idempotency anahtarı, geç yanıtın farklı vakaya karışmaması; uzun yanıtta alta kaydırma, geçmiş konumunu koruma, son mesaja dönme ve otomatik/öğrenci kaydırma ayrımı sınandı. Birim kontrolleri ve DOM/API test ikizleridir.
+- Mevcut `student-editor.cjs` **45**, `auth-preview-ui.cjs` **17** kontrol geçti. Değişen JS dosyaları `node --check`, farklar `git diff --check` ile kontrol edildi.
+- Gerçek tarayıcı/HTTP/AI kabulü yapılmadı. PHP veya veri şeması değişmedi; deploy yapılmadı.
+
 ## AI yapılandırması, editör ve adım okları — 2026-11-20
 
 - `node tests/student-editor.cjs`: **45 kontrol geçti**. Metin/Unicode/seçim koruması, Markdown önizlemesinde HTML kaçışları, boş alana sahte yanıt eklenmemesi, geri al/yinele, textarea ile otomatik kayıt sözleşmesi, salt okunur alanlar, adım sınırları, kayıt hatası, çift tıklama ve bölüm telemetrisi sınandı. Birim kontrolleri ve DOM/API test ikizleridir.
