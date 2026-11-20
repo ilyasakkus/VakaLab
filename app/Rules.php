@@ -3,6 +3,7 @@ declare(strict_types=1);
 final class Rules {
     public static function draft(array $d): array {
         $out=[];
+        if(array_key_exists('response_mode',$d)){demand($d['response_mode']==='forum','Yanıt düzeni geçersiz');$out['response_mode']='forum';}
         foreach(['knowledge','confidence','difficulty','severity','final_confidence','final_difficulty','final_severity'] as $k){$v=$d[$k]??null;demand($v===null||(is_int($v)&&$v>=0&&$v<=10),'Puan 0–10 tam sayı olmalı');$out[$k]=$v;}
         foreach(['problem','decision','reason','final_decision','final_reason','reflection','question'] as $k){$v=$d[$k]??'';demand(is_string($v)&&strlen($v)<=60000,'Metin sınırı aşıldı');$out[$k]=$v;}
         if(array_key_exists('rich_text',$d)){demand(is_array($d['rich_text']),'Editör verisi geçersiz');$rich=RichText::normalize($d['rich_text'],$out);if($rich)$out['rich_text']=$rich;}
@@ -10,10 +11,10 @@ final class Rules {
     }
     public static function initial(array $d): void {
         foreach(['knowledge','confidence','difficulty','severity'] as $k)demand($d[$k]!==null,'Dört profil alanını doldurun');
-        foreach(['problem','decision','reason'] as $k)demand(trim($d[$k])!=='','Başlangıç alanlarını doldurun');
+        if(($d['response_mode']??'')!=='forum')foreach(['problem','decision','reason'] as $k)demand(trim($d[$k])!=='','Başlangıç alanlarını doldurun');
     }
     public static function final(array $d): void {
-        foreach(['final_decision','final_reason','reflection'] as $k)demand(trim($d[$k])!=='','Nihai yanıt ve yansıtmayı doldurun');
+        foreach(($d['response_mode']??'')==='forum'?['reflection']:['final_decision','final_reason','reflection'] as $k)demand(trim($d[$k])!=='','Nihai yanıt ve yansıtmayı doldurun');
         demand($d['final_confidence']!==null,'Nihai güveni seçin');
         demand(($d['final_difficulty']??null)!==null,'Nihai algılanan zorluğu seçin');
         demand(($d['final_severity']??null)!==null,'Nihai algılanan ciddiyeti seçin');
@@ -22,7 +23,7 @@ final class Rules {
         // Validate historical submissions without inventing later-added measurements.
         // New submissions must use final(), including all current measurements.
         $validated=self::draft($d);self::initial($validated);
-        foreach(['final_decision','final_reason','reflection'] as $key)demand(trim($validated[$key])!=='','Teslim edilmiş yanıt eksik');
+        foreach(($validated['response_mode']??'')==='forum'?['reflection']:['final_decision','final_reason','reflection'] as $key)demand(trim($validated[$key])!=='','Teslim edilmiş yanıt eksik');
         demand($validated['final_confidence']!==null,'Teslim edilmiş nihai güven eksik');
         return array_values(array_filter(['final_severity','final_difficulty'],fn($key)=>$validated[$key]===null));
     }

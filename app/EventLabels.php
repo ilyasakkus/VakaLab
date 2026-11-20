@@ -22,6 +22,7 @@ final class EventLabels {
         'section_leave'=>['Çalışma ekranından ayrıldı','Gezinme','Vakalarım ekranına dönüş veya çıkışla mevcut bölüm ziyareti kapandı.'],
         'workflow_confirmed'=>['Yanıtlar kesinleştirildi','Teslim durumu','Başlangıcın kesinleşmesi veya son teslimin sunucuda başarıyla kaydedilmesi doğrulandı.'],
         'message_send'=>['AI mesajı gönderimi başlatıldı','Mesaj durumu','AI isteğinin gönderilme girişimi kaydedildi; başarı ve soru amacı sunucu isteğiyle eşleştirilerek belirlenir.'],
+        'forum_posted'=>['Forum mesajı paylaşıldı','Tartışma','Ortak vaka forumunda mesajın sunucuya kaydedildiği doğrulandı. payload.phase: before (Önce), after (Sonra); parent_id yanıt verilen mesajdır.'],
         'app_presence'=>['Uygulama durumu değişti','Gezinme','Uygulamadan ayrılma veya uygulamaya dönüş kaydı.'],
     ];
     public const SECTIONS = ['case'=>'Vaka metni','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];

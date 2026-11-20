@@ -91,6 +91,37 @@ body[data-ui-role="student"] .student-rich-editor .ql-tooltip::before { content:
 body[data-ui-role="student"] .student-rich-editor .ql-tooltip a.ql-action::after { content: "Düzenle"; }
 body[data-ui-role="student"] .student-rich-editor .ql-tooltip.ql-editing a.ql-action::after { content: "Kaydet"; }
 body[data-ui-role="student"] .student-rich-editor .ql-tooltip a.ql-remove::before { content: "Kaldır"; }
+.case-forum { margin: 30px 0; padding: 24px 0 0; border-top: 2px solid #d6e3d9; min-width: 0; }
+#section-body > .case-forum:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.forum-questions { margin: 16px 0 24px; padding: 18px 22px; border: 1px solid #d5e3d7; border-radius: 10px; background: #f0f6ee; }
+.forum-questions ol { margin: 10px 0 0; padding-left: 22px; }.forum-questions li + li { margin-top: 14px; }
+.forum-questions h4 { margin: 0; font-size: 16px; line-height: 1.65; }.forum-final-profile { margin-top: 28px; }
+.forum-heading, .forum-post-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.forum-heading h3 { margin: 6px 0 10px; font-size: 22px; }
+.forum-heading > button { padding: 8px 13px; font-size: 13px; }
+.forum-permission:not(:empty) { padding: 12px 16px; border-left: 3px solid #b18c3e; background: #fff6e5; border-radius: 5px; line-height: 1.7; }
+.forum-error:not([hidden]) { padding: 12px 16px; border: 1px solid #c7968d; background: #fff3ef; color: #8a3030; border-radius: 7px; margin: 12px 0; }
+.forum-feed { max-height: 650px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 0; scrollbar-width: thin; }
+.forum-feed[hidden], .forum-composer[hidden], .forum-reply-target[hidden], [data-forum-more][hidden] { display: none; }
+.forum-post { margin: 14px 0; padding: 18px; border: 1px solid #dce4de; border-radius: 10px; background: #fbfcfa; min-width: 0; overflow-wrap: anywhere; }
+.forum-post.is-reply { border-left: 3px solid #aac2b1; margin-left: 18px; }
+.forum-post[data-depth="2"] { margin-left: 36px; }.forum-post[data-depth="3"] { margin-left: 48px; }
+.forum-post[data-depth="4"], .forum-post[data-depth="5"], .forum-post[data-depth="6"] { margin-left: 60px; }
+.forum-post.is-selected-student { border-color: #6b9a79; background: #edf6ee; }
+.forum-post-heading { font-size: 14px; }.forum-post-heading time { color: var(--muted); font-size: 12px; }
+.forum-parent { color: var(--muted); background: #eef2ec; padding: 8px 12px; border-radius: 5px; font-size: 12px; line-height: 1.6; }
+.forum-post-body { margin: 14px 0; line-height: 1.8; white-space: normal; overflow-wrap: anywhere; }
+.forum-post-body p { margin: 0 0 .8em; white-space: pre-wrap; }.forum-post-body p:last-child { margin-bottom: 0; }
+.forum-post-body .ql-align-center { text-align: center; }.forum-post-body .ql-align-right { text-align: right; }.forum-post-body .ql-align-justify { text-align: justify; }
+.forum-post-body .ql-font-serif { font-family: Georgia, 'Times New Roman', serif; }.forum-post-body .ql-font-monospace { font-family: monospace; }
+.forum-post-body .ql-size-small { font-size: .75em; }.forum-post-body .ql-size-large { font-size: 1.5em; }.forum-post-body .ql-size-huge { font-size: 2em; }
+.forum-post-body [class*="ql-indent-"] { padding-left: 1.5em; }.forum-post-body blockquote { border-left: 3px solid #aac2b1; padding-left: 14px; margin-left: 0; }
+.forum-post .forum-reply { padding: 6px 12px; min-height: 34px; font-size: 12px; }
+.forum-composer { margin-top: 24px; }.forum-composer .row { align-items: center; }.forum-draft-status { font-size: 12px; }
+.forum-reply-target { padding: 12px; background: #eaf2e9; border-radius: 7px; font-size: 13px; }
+.forum-reply-target button { margin-left: 8px; padding: 5px 9px; min-height: 32px; font-size: 12px; }
+.research-forums { max-width: 100%; }.research-forums > summary { font-size: 18px; }
+@media (max-width: 600px) { .case-forum { padding-top: 18px; }.forum-heading h3 { font-size: 19px; }.forum-post { padding: 14px; }.forum-post.is-reply, .forum-post[data-depth] { margin-left: 12px; }.forum-post[data-depth="0"] { margin-left: 0; } }
 @media (max-width: 600px) {
     body[data-ui-role="student"] .student-rich-editor .ql-toolbar.ql-snow { padding: 7px; }
     body[data-ui-role="student"] .student-rich-editor .ql-toolbar .ql-formats { margin-right: 6px; }

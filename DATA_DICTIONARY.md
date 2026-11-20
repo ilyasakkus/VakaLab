@@ -33,6 +33,11 @@ Tüm iç kimlikler değişmeyen 32 hex karakterdir; test fixture kimlikleri `tes
 | draft_revisions | app_id + revision, previous_revision, body, created_at | yalnız değişen içerikte yeni sürüm; JSON bütün form snapshotı |
 | snapshots | app_id + kind (initial/submit); revision, body | iki atomik kesinleşme, immutable |
 | messages | app_id + seq, role, content, status, request_id | immutable gönderilmiş metin; taslak soru burada yok |
+| case_forums | case_id + phase, created_at | vaka başına unique before/after; tüm atanmış öğrenciler ve denemeler için ortak iki alan |
+| forum_posts | forum_id, app_id, user_id, version_id, parent_id, client_key, body, rich_text, created_at | append-only; aynı forumdaki mesaja yanıt FK ile korunur; app/forum/client_key unique; zaman UTC sunucu zamanı |
+| applications.draft.response_mode | `forum` | bireysel problem/karar/gerekçe editörleri yerine ortak forum katkısı; mevcut bireysel alanlar geçmiş veriyi korumak için silinmez |
+| snapshots.body.forum_posts | yalnız bu app_id'nin ilgili aşamadaki mesajları: id, parent_id, body, rich_text, created_at | başlangıç/teslim anında sunucu tarafından dondurulur; katılımcının kendi kanıtıdır, sınıf arkadaşlarının katkıları dahil edilmez |
+| review_questions.source_id | forum_before, forum_after, reflection | forum düzenindeki güncel rapor kaynakları; eski bireysel teslimlerin altı özgün soru kimliği korunur |
 | ai_requests | app_id + client_key, attempt, model, directive, payload, status, started/completed/error | tek aktif applications.active_request ile seri; payload yalnız allowlist |
 | ai_attempts | request_id, id (attempt fence), status, started/completed/error | tekrar denemeler geçmişi ezmez |
 | events | app_id + client_key, session_id, tab_id, client_seq, client_at, received_at, type, section, payload, quality | unique dedup; istemci zamanı güvenilir sunucu zamanı değildir |

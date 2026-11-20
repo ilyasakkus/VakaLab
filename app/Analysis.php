@@ -3,7 +3,7 @@ declare(strict_types=1);
 final class Analysis {
     public function __construct(private App $app) {}
     public function newRun(array $u,string $id,string $rubric,int $reviewVersion=1): array {
-        Auth::researcher($u);$a=$this->app->access($u,$id);demand($a['state']==='submitted','Yalnız teslim edilmiş veri analiz edilir',409);$r=Scope::owned($this->app->db,$u,'definitions',$rubric);$r=$this->app->db->one("SELECT * FROM definitions WHERE id=? AND family='rubric' AND archived=0 AND deleted_at IS NULL",[$rubric]);demand((bool)$r,'Rubrik seçin');Rules::rubric(obj($r['body']));
+        Auth::researcher($u);$a=$this->app->access($u,$id);demand($a['state']==='submitted','Yalnız teslim edilmiş veri analiz edilir',409);demand((obj($a['draft'])['response_mode']??'')!=='forum','Forum yanıtlarını güncel soru bazlı değerlendirme ekranından inceleyin',409);$r=Scope::owned($this->app->db,$u,'definitions',$rubric);$r=$this->app->db->one("SELECT * FROM definitions WHERE id=? AND family='rubric' AND archived=0 AND deleted_at IS NULL",[$rubric]);demand((bool)$r,'Rubrik seçin');Rules::rubric(obj($r['body']));
         $run=['id'=>uid(),'app_id'=>$id,'rubric_id'=>$rubric,'created_at'=>now()];demand(in_array($reviewVersion,[1,2],true),'Değerlendirme sürümü geçersiz');$this->app->db->tx(function()use($run,$u,$reviewVersion){$this->app->db->lock($run['app_id']);$this->app->db->insert('analysis_runs',$run);if($reviewVersion===2)$this->app->db->q('UPDATE reports SET approved_at=NULL,published_at=NULL WHERE app_id=?',[$run['app_id']]);$this->app->db->audit($u['id'],'analysis_run',$run['id'],'',['review_version'=>$reviewVersion]);});return $run+['review_version'=>$reviewVersion];
     }
     public function currentStep(string $runId,int $step): ?array {

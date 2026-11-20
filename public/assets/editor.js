@@ -39,12 +39,12 @@
         const lines=[];let fragments=[];
         for(const op of doc.ops){const attrs=op.attributes||{},parts=op.insert.split('\n');
             for(let i=0;i<parts.length;i++){
-                if(parts[i]){let html=escape(parts[i]);if(attrs.bold)html='<strong>'+html+'</strong>';if(attrs.italic)html='<em>'+html+'</em>';if(attrs.underline)html='<u>'+html+'</u>';if(attrs.strike)html='<s>'+html+'</s>';if(attrs.link)html='<a href="'+escape(attrs.link)+'" target="_blank" rel="noopener noreferrer">'+html+'</a>';fragments.push(html);}
+                if(parts[i]){let html=escape(parts[i]);if(attrs.bold)html='<strong>'+html+'</strong>';if(attrs.italic)html='<em>'+html+'</em>';if(attrs.underline)html='<u>'+html+'</u>';if(attrs.strike)html='<s>'+html+'</s>';if(attrs.link)html='<a href="'+escape(attrs.link)+'" target="_blank" rel="noopener noreferrer">'+html+'</a>';const classes=[attrs.font?'ql-font-'+attrs.font:'',attrs.size?'ql-size-'+attrs.size:''].filter(Boolean).join(' ');if(classes||attrs.color||attrs.background)html='<span class="'+classes+'"'+(attrs.color?' data-rich-color="'+attrs.color+'"':'')+(attrs.background?' data-rich-background="'+attrs.background+'"':'')+'>'+html+'</span>';fragments.push(html);}
                 if(i<parts.length-1){lines.push({html:fragments.join('')||'<br>',attrs});fragments=[];}
             }
         }
         const out=[];let list='';const close=()=>{if(list){out.push('</'+list+'>');list='';}};
-        for(const line of lines){if(line.attrs.list){const tag=line.attrs.list==='ordered'?'ol':'ul';if(list!==tag){close();list=tag;out.push('<'+tag+'>');}out.push('<li>'+line.html+'</li>');}else{close();const tag=line.attrs.header?'h'+Math.min(6,line.attrs.header+2):line.attrs.blockquote?'blockquote':'p';out.push('<'+tag+'>'+line.html+'</'+tag+'>');}}
+        for(const line of lines){const classes=[line.attrs.align?'ql-align-'+line.attrs.align:'',line.attrs.indent?'ql-indent-'+line.attrs.indent:''].filter(Boolean).join(' '),attr=classes?' class="'+classes+'"':'';if(line.attrs.list){const tag=line.attrs.list==='ordered'?'ol':'ul';if(list!==tag){close();list=tag;out.push('<'+tag+'>');}out.push('<li'+attr+'>'+line.html+'</li>');}else{close();const tag=line.attrs.header?'h'+Math.min(6,line.attrs.header+2):line.attrs.blockquote?'blockquote':'p';out.push('<'+tag+attr+'>'+line.html+'</'+tag+'>');}}
         close();return out.join('');
     }
     function toolbar(doc){
@@ -94,14 +94,17 @@
         if(bar){
             bar.querySelectorAll('.ql-picker').forEach(picker=>{const select=picker.nextElementSibling,caption=select?.getAttribute('aria-label');if(caption){const control=picker.querySelector('.ql-picker-label');control?.setAttribute('aria-label',caption);control?.setAttribute('title',caption);}});
         }
-        counter();const controller={quill,wrapper,focus(){if(!textarea.disabled)quill.focus({preventScroll:true});},destroy(){quill.off('text-change',change);label?.removeEventListener('click',focusLabel);quill.root.removeEventListener('focus',focus);wrapper.removeEventListener('focusout',blur);textarea.removeEventListener('input',sync);controllers.delete(textarea);mounted.delete(controller);}};
+        counter();const controller={quill,wrapper,setText(text){quill.setText(text,'silent');textarea.value=text;quill.history.clear();counter();},focus(){if(!textarea.disabled)quill.focus({preventScroll:true});},destroy(){quill.off('text-change',change);label?.removeEventListener('click',focusLabel);quill.root.removeEventListener('focus',focus);wrapper.removeEventListener('focusout',blur);textarea.removeEventListener('input',sync);controllers.delete(textarea);mounted.delete(controller);}};
         controllers.set(textarea,controller);mounted.add(controller);return quill;
     }
     const editor={fields,formats,normalize,plainText,fromText,render,mount,
         has:textarea=>controllers.has(textarea),get:textarea=>controllers.get(textarea)?.quill,
         element:textarea=>controllers.get(textarea)?.quill.root,
         focus:textarea=>controllers.get(textarea)?.focus(),
+        setText(textarea,text){const controller=controllers.get(textarea);if(controller)controller.setText(text);else textarea.value=text;},
         validation(textarea,invalid,id){const current=controllers.get(textarea);if(!current)return;current.wrapper.classList.toggle('field-invalid',invalid);current.quill.root.setAttribute('aria-invalid',String(invalid));if(invalid)current.quill.root.setAttribute('aria-describedby',id);else current.quill.root.removeAttribute('aria-describedby');},
+        decorate(element){element.querySelectorAll('[data-rich-color],[data-rich-background]').forEach(node=>{if(/^#[0-9a-f]{6}$/i.test(node.dataset.richColor||''))node.style.color=node.dataset.richColor;if(/^#[0-9a-f]{6}$/i.test(node.dataset.richBackground||''))node.style.backgroundColor=node.dataset.richBackground;});},
+        unmount(textarea){controllers.get(textarea)?.destroy();},
         destroyAll(){for(const controller of [...mounted])controller.destroy();}
     };
     if(typeof module!=='undefined'&&module.exports)module.exports=editor;if(root)root.VakaEditor=editor;

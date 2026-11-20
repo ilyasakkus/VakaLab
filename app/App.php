@@ -27,10 +27,11 @@ final class App {
     public function view(array $u,string $id): array {
         $a=$this->access($u,$id);$v=$this->db->one('SELECT * FROM case_versions WHERE id=?',[$a['version_id']]);
         $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions']], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
+        $result['forum_participation']=['before'=>0,'after'=>0];foreach($this->db->all('SELECT f.phase,COUNT(*) n FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id WHERE p.app_id=? GROUP BY f.phase',[$id]) as $count)$result['forum_participation'][$count['phase']]=(int)$count['n'];
         if($u['role']==='researcher'){
             foreach(['events','draft_revisions','ai_requests','analysis_runs','reports','research_notes'] as $t)$result[$t]=$this->db->all('SELECT * FROM '.$t.' WHERE app_id=?'.($t==='analysis_runs'?' ORDER BY created_at,id':''),[$id]);
             foreach($result['analysis_runs'] as &$reviewRun)$reviewRun['review_version']=Review::version($this->db,$reviewRun['id']);unset($reviewRun);
-            $result['review_questions']=[];$reviewDraft=obj($a['draft']);foreach(Review::QUESTIONS as $step=>$questions)foreach($questions as $key=>$title)$result['review_questions'][]=['source_id'=>$key,'section'=>[3=>'Başlangıç değerlendirmesi',4=>'Nihai değerlendirme',6=>'Yansıtma'][$step],'question'=>$title,'answer'=>$reviewDraft[$key]??''];
+            $result['review_questions']=Forum::reviewQuestions($this->db,$a);
             $result['labels']=$this->db->all('SELECT l.* FROM message_labels l JOIN messages m ON m.id=l.message_id WHERE m.app_id=?',[$id]);
             $result['label_reviews']=$this->db->all('SELECT l.* FROM label_reviews l JOIN messages m ON m.id=l.message_id WHERE m.app_id=? ORDER BY l.created_at',[$id]);
             $result['steps']=$this->db->all('SELECT s.* FROM analysis_steps s JOIN analysis_runs r ON r.id=s.run_id WHERE r.app_id=? ORDER BY s.created_at,s.step,s.attempt',[$id]);
@@ -53,16 +54,19 @@ final class App {
             demand($a['state']!=='submitted','Teslim edilmiş çalışma değişmez',409);
             demand((int)($p['revision']??-1)===(int)$a['revision'],'Sürüm çakışması. Metninizi kopyalayın ve yeniden yükleyin.',409);
             $d=Rules::draft($p['draft']??[]);$old=obj($a['draft']);
+            if(($old['response_mode']??'')==='forum')demand(($d['response_mode']??'')==='forum','Forum yanıt düzeni değiştirilemez',409);
             if($a['initial_at'])foreach(['knowledge','confidence','difficulty','severity','problem','decision','reason'] as $k)demand($d[$k]===$old[$k],'Başlangıç ve profil kilitli',409);
             if(!$a['initial_at'])foreach(['final_decision','final_reason','reflection','final_confidence','final_difficulty','final_severity','question'] as $k)demand($d[$k]===($old[$k]??null),'Önce başlangıcı kesinleştirin',409);
             if($a['initial_at'])RichText::lock($old,$d,['problem','decision','reason'],'Başlangıç biçimlendirmesi kilitli');
             else RichText::lock($old,$d,['final_decision','final_reason','reflection','question'],'Önce başlangıcı kesinleştirin');
-            if($action==='initial')Rules::initial($d);
+            $forumPosts=null;
+            if($action==='initial'){Rules::initial($d);if(($d['response_mode']??'')==='forum'){$forumPosts=Forum::contributions($this->db,$id,'before');demand((bool)$forumPosts,'Genel Tartışma Forumu (Önce) alanında en az bir görüş veya yanıt paylaşın');}}
             if($action==='submit'){demand((bool)$a['initial_at'],'Başlangıç kilitlenmeli',409);demand(!$a['active_request'],'AI yanıtı sürerken teslim yapılamaz',409);Rules::final($d);}
+            if($action==='submit'&&($d['response_mode']??'')==='forum'){$forumPosts=Forum::contributions($this->db,$id,'after');demand((bool)$forumPosts,'Genel Tartışma Forumu (Sonra) alanında nihai görüşünüzü paylaşın');}
             $rev=(int)$a['revision'];if($d!==$old){$rev++;$this->db->insert('draft_revisions',['id'=>uid(),'app_id'=>$id,'revision'=>$rev,'previous_revision'=>$a['revision'],'body'=>js($d),'created_at'=>now()]);}
             $state=$action==='initial'?'working':($action==='submit'?'submitted':$a['state']);
             $this->db->q('UPDATE applications SET draft=?,revision=?,state=?,initial_at=?,submitted_at=?,last_activity=? WHERE id=?',[js($d),$rev,$state,$action==='initial'?now():$a['initial_at'],$action==='submit'?now():$a['submitted_at'],now(),$id]);
-            if($action!=='save'){$body=$action==='initial'?array_intersect_key($d,array_flip(['knowledge','confidence','difficulty','severity','problem','decision','reason'])):array_intersect_key($d,array_flip(['final_decision','final_reason','final_confidence','final_difficulty','final_severity','reflection']));$rich=array_intersect_key($d['rich_text']??[],$body);if($rich)$body['rich_text']=$rich;$this->db->insert('snapshots',['id'=>uid(),'app_id'=>$id,'kind'=>$action,'body'=>js($body),'revision'=>$rev,'created_at'=>now()]);}
+            if($action!=='save'){$body=$action==='initial'?array_intersect_key($d,array_flip(['knowledge','confidence','difficulty','severity','problem','decision','reason'])):array_intersect_key($d,array_flip(['final_decision','final_reason','final_confidence','final_difficulty','final_severity','reflection']));if($forumPosts!==null){$body['response_mode']='forum';$body['forum_posts']=$forumPosts;}$rich=array_intersect_key($d['rich_text']??[],$body);if($rich)$body['rich_text']=$rich;$this->db->insert('snapshots',['id'=>uid(),'app_id'=>$id,'kind'=>$action,'body'=>js($body),'revision'=>$rev,'created_at'=>now()]);}
             $this->db->audit($u['id'],$action,$id,'',['revision'=>$rev]);return $this->db->one('SELECT * FROM applications WHERE id=?',[$id]);
         }));
     }

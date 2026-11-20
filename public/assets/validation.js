@@ -8,8 +8,10 @@ const requiredFields = {
     problem: {section:'initial', label:'Temel problem değerlendirmesi'},
     decision: {section:'initial', label:'Başlangıç kararı'},
     reason: {section:'initial', label:'Başlangıç kararının gerekçesi'},
+    forum_before: {section:'initial', label:'Genel Tartışma Forumu (Önce)', forum:'before'},
     final_decision: {section:'final', label:'Nihai karar'},
     final_reason: {section:'final', label:'Nihai kararın gerekçesi'},
+    forum_after: {section:'final', label:'Genel Tartışma Forumu (Sonra)', forum:'after'},
     final_confidence: {section:'final', label:'Nihai güven', score:true},
     final_difficulty: {section:'final', label:'Nihai algılanan zorluk', score:true},
     final_severity: {section:'final', label:'Nihai algılanan ciddiyet', score:true},
@@ -21,6 +23,9 @@ function missingFields(scope) {
     return Object.keys(requiredFields).filter(key => {
         const rule = requiredFields[key];
         if ((scope === 'initial') !== ['profile','initial'].includes(rule.section)) return false;
+        const forum=work.draft.response_mode==='forum';
+        if(rule.forum)return forum&&!(work.forum_participation?.[rule.forum]>0);
+        if(forum&&['problem','decision','reason','final_decision','final_reason'].includes(key))return false;
         const value = work.draft[key];
         return rule.score ? !Number.isInteger(value) || value < 0 || value > 10 : typeof value !== 'string' || !value.trim();
     });
@@ -37,6 +42,7 @@ function goToRequiredField(key, scope) {
     section = rule.section;
     renderWork();
     event('section_open', {reason:'validation', field:key});
+    if(rule.forum){notify(rule.label+' alanında en az bir görüş veya yanıt paylaşın.');const view=forumViews.find(view=>view.phase===rule.forum);view?.ready.then(()=>view.focus());return;}
     const input = document.getElementById(key);
     if (input) {
         const visible = typeof VakaEditor !== 'undefined' ? VakaEditor.element(input) || input : input;
@@ -109,7 +115,7 @@ function updateSubmitGate() {
     const missing = missingFields('submit');
     if (a.state === 'submitted') help.textContent = 'Vaka teslim edildi. Yanıtlarınız yalnızca görüntülenebilir.';
     else if (locked()) help.textContent = 'Bu sekmede teslim yapılamaz. Salt okunur veya sürüm çakışması açıklamasını kontrol edin.';
-    else if (!a.initial_at) help.textContent = 'Önce vaka profilinizi ve başlangıç değerlendirmenizi kesinleştirin.';
+    else if (!a.initial_at) help.textContent = 'Önce vaka profilinizi doldurun ve (Önce) forumundaki tartışmayı tamamlayın.';
     else if (missing.length) {
         help.textContent = 'Son teslim için yukarıdaki zorunlu alanları tamamlayın.';
     } else if (busy || a.active_request) help.textContent = 'AI yanıtı sürüyor. Yanıt tamamlandığında teslim açılacaktır.';

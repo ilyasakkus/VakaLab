@@ -1,5 +1,17 @@
 # Değişiklik günlüğü
 
+## 2026-11-20 — Soruların forum tartışma başlığına dönüştürülmesi
+
+Stepper'daki başlangıç ve nihai değerlendirme sekmeleri Genel Tartışma Forumu (Önce)/(Sonra) olarak adlandırıldı. Üç başlangıç sorusu ve tek nihai karar sorusu ilgili forumun içinde yönlendirici başlık olarak gösterilir; ayrı bireysel yanıt editörleri kaldırıldı. Yeni arayüz `draft.response_mode=forum` kullanır. Geçiş/teslimde gizli kalmış bireysel alanlar istenmez; ilgili forumda öğrencinin en az bir kendi mesajı veya yanıtı doğrulanır. Profil/güven ölçümleri ve yansıtma korunur.
+
+Kesinleşen kayıtta öğrencinin kendi forum mesajları ve yanıt ilişkileri dondurulur. Güncel soru bazlı rapor iki forum aşaması ve yansıtmayı kaynak alır; eski altı sorulu teslimler aynı kalır. Eski başlangıcını önceden tamamlamış öğrencinin ilk yanıtları korunarak yeni nihai foruma geçişi desteklenir. Ek SQL migration veya eski mesajların yeniden seed edilmesi gerekmez.
+
+## 2026-11-20 — AI öncesi ve sonrası ortak vaka tartışmaları
+
+Üç başlangıç sorusu ve bireysel nihai yanıtlar korunarak altlarına ayrı (Önce)/(Sonra) forumları eklendi. Vaka arkadaşları çoklu bağımsız mesaj ve iç içe yanıt paylaşabilir. Başlangıç kesinleştirme öncesi yazma, gerçek kişisel AI yanıtı sonrası erişim, teslim/atama/kapanış kontrolleri sunucuda uygulanır. Zengin metin doğrulanmış Delta olarak saklanır; forum taslağı bireysel formdan ayrıdır. Aynı mesajın ağ yeniden denemelerinde çoğalmasını engelleyen istemci anahtarı, kademeli listeleme ve periyodik yenileme vardır. Gönderilmiş mesajlar değiştirilmez veya silinmez.
+
+Additive migration 004 mevcut vakaların iki forumunu otomatik hazırlar; vaka oluşturma, test seed'i ve izole admin önizlemesi de bu yapıyı kullanır. Öğrenci-vaka dosyasına iki aşamayı birlikte inceleme eklendi. JSON/Excel veri seti mesajların aşama/yanıt/yazar/deneme/sürüm/zaman bilgisini taşır; kodlanmış çıktı metinleri ve doğrudan kimliği çıkarır. Bireysel AI konuşmaları forum yanıtlarına, ortak mesajlar AI/puanlama girdilerine eklenmez.
+
 ## 2026-11-20 — Quill zengin metin editörü
 
 Basit Markdown arayüzü hazır Quill 2.0.3 / Snow paketiyle değiştirildi. Dağıtım dosyaları BSD-3-Clause lisansı ve doğrulama hashleriyle yereldir; CSP gevşetilmedi ve CDN bağımlılığı eklenmedi. Türkçe araç çubuğu yazı tipi/boyutu, kalın/italik/altı çizili/üstü çizili, renk/vurgu, başlık, liste/girinti/hizalama, alıntı ve bağlantı içerir. Quill'in kendi geri alma, klavye, seçim ve yapıştırma mekanizmaları kullanılır.

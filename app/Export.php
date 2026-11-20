@@ -23,6 +23,17 @@ final class Export {
             $out['participants']=array_values(array_filter($db->all("SELECT id,login,name,status,metadata,test FROM users WHERE owner_id=? AND role='student'",[$u['id']]),fn($s)=>in_array($s['id'],$sids,true)));
         }
         $out['dictionary']=array_merge($out['dictionary'],EventLabels::dictionary());
+        $out['case_forums']=[];$out['forum_posts']=[];
+        // Select posts through the already-filtered applications, preserving
+        // test/exclusion, participant and researcher workspace boundaries.
+        $appIds=array_column($apps,'id');$forumIds=[];
+        foreach($db->all('SELECT p.*,f.case_id,f.phase,a.attempt_no FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id JOIN applications a ON a.id=p.app_id JOIN cases c ON c.id=f.case_id WHERE c.owner_id=? ORDER BY p.created_at,p.id',[$u['id']]) as $post){
+            if(!in_array($post['app_id'],$appIds,true))continue;$forumIds[]=$post['forum_id'];
+            if($coded){$post['participant']='P-'.substr(hash('sha256',$post['user_id']),0,12);unset($post['user_id'],$post['client_key']);$post['body']='[kodlanmış çıktıda metin çıkarıldı]';$post['rich_text']='[çıkarıldı]';}
+            $out['forum_posts'][]=$post;
+        }
+        foreach($db->all('SELECT f.* FROM case_forums f JOIN cases c ON c.id=f.case_id WHERE c.owner_id=? ORDER BY f.case_id,f.phase',[$u['id']]) as $forum)if(in_array($forum['case_id'],array_column($apps,'case_id'),true)||in_array($forum['id'],$forumIds,true))$out['case_forums'][]=$forum;
+        $out['dictionary'][]=['field'=>'forum_posts.phase','meaning'=>'before: AI öncesi ortak tartışma; after: öğrencinin ilk AI yanıtından sonraki ortak tartışma. app_id/attempt_no yazara ait denemeyi, parent_id yanıt verilen mesajı belirtir.'];
         foreach($apps as $a){$id=$a['id'];foreach($db->all("SELECT id,detail,created_at FROM audit WHERE target=? AND action='message_labels_ai' ORDER BY created_at,id",[$id]) as $batch){if($coded)$batch['detail']=js(array_intersect_key(obj($batch['detail']),array_flip(['batch_id','labels','target_role','message_scope'])));$out['label_batches'][]=$batch+['app_id'=>$id];}if(!$coded){foreach(['reports','research_notes'] as $t)foreach($db->all('SELECT * FROM '.$t.' WHERE app_id=?',[$id]) as $row)$out[$t][]=$row;}$code='P-'.substr(hash('sha256',$a['user_id']),0,12);$out['applications'][]=$coded?['app_id'=>$id,'participant'=>$code,'case_id'=>$a['case_id'],'attempt_no'=>(int)$a['attempt_no'],'state'=>$a['state'],'revision'=>$a['revision'],'submitted_at'=>$a['submitted_at']]:$a;
             foreach($db->all('SELECT id,action,target,detail,created_at FROM audit WHERE target=? ORDER BY created_at',[$id]) as $serverEvent){if($coded)$serverEvent['detail']='[çıkarıldı]';$out['server_events'][]=$serverEvent;}
             foreach($db->all('SELECT t.* FROM ai_attempts t JOIN ai_requests r ON r.id=t.request_id WHERE r.app_id=?',[$id]) as $attempt)$out['ai_attempts'][]=$attempt;

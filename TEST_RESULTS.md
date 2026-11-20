@@ -1,5 +1,19 @@
 # Gerçek test sonuçları — 2026-10-20
 
+## Soruların ortak forum başlığına dönüşmesi — 2026-11-20
+
+- `tests/forum-prompts.php`: **22 kontrol geçti**, gerçek PHP 8.3 WebAssembly + PDO/SQLite. Boş bireysel alanlarla yeni forum akışı, ilgili aşamada kendi katkısı zorunluluğu, başkasının katkısının sayılmaması, soru sayıları, ilk/son snapshot, özel AI sohbeti, iki forum kaynağı üzerinden güncel rapor üretimi, eski teslimler ve devam eden eski başlangıçların korunması sınandı. Rapor üretimindeki AI sağlayıcısı sentetik test sağlayıcısıdır.
+- `tests/forum-workflow.cjs`: güncel düzende **11 kontrol geçti**, gerçek Quill/jsdom ve test API'si. Stepper adları, üç/tek soru başlığı, ayrı bireysel yanıt editörlerinin yokluğu, forum katkısı üzerinden doğrulama, taslak kurtarma ve teslim akışı doğrulandı. Önceki 9 kontrolün yerine bu 11 kontrol geçerlidir.
+- Mevcut forum/PHP/editör/sohbet/hesap regresyonları yeniden geçti. Yeni düzen için gerçek görsel tarayıcı ve canlı MySQL/AI testi yapılmadı; deploy yapılmadı.
+- Ek `holistic-review.php` regresyonunun ilk **48 kontrolü** geçti; DOCX dışa aktarım bölümünde geçici WebAssembly ortamında Composer vendor paketleri bulunmadığı için test tamamlanamadı (`Vendor kurulmadı`). Bu testin tamamı başarılı sayılmadı; DOCX/PDF üretimi bu turda doğrulanmadı.
+
+## Ortak vaka forumları — 2026-11-20
+
+- `tests/forum.php`: **54 kontrol geçti**. Gerçek PHP 8.3 WebAssembly çalışma zamanı ve PDO/SQLite kullanıldı: mevcut/yeni vaka forumları, tekrarlanabilir migration/seed, çoklu mesaj/iç içe yanıt, mesaj tekilleştirme, rich text, vaka/aşama/yetki sınırları, AI yanıtı kapısı, başlangıç/teslim/kapanış/ek süre, özel sohbetlerin ayrılığı, audit, filtreli/kodlanmış export, izole önizleme, 100 mesaj üstü sayfalama ve FK bütünlüğü.
+- `tests/forum-dom.cjs`: **24 kontrol**, `tests/forum-workflow.cjs`: **9 kontrol geçti**. Gerçek Quill 2.0.3 ve jsdom 26.1.0 ile gönderme/yanıtlama, güvenli rich gösterim, ağ hatası/idempotency, taslak kurtarma, geç yanıt, kilitler, önce/sonra yerleşimi, üç bireysel sorunun korunması ve teslimde başka adımda kalmış forum taslağının kurtarılması sınandı. Forum API'si bu DOM testlerinde test ikizidir; görsel tarayıcı testi değildir.
+- PHP regresyonları aynı gerçek PHP/SQLite ortamında geçti: `rich-text.php` **24**, `auth-preview.php` **80**, `new-attempt.php` **39** kontrol. Önceki editör, sohbet ve hesap arayüzü regresyonları: `student-editor.cjs` **41**, `chat-ui.cjs` **44**, `auth-preview-ui.cjs` **17**, gerçek Quill DOM **23** kontrol geçti.
+- Toplam **355 kontrol** geçti. WebAssembly test araçları geçici dizinde tutuldu; üretim bağımlılığı eklenmedi. MySQL üzerinde migration, gerçek HTTP/görsel tarayıcı ve canlı AI kabulü yapılmadı; canlı veri değiştirilmedi, deploy yapılmadı.
+
 ## Hazır Quill editörü — 2026-11-20
 
 - Gerçek yerel **Quill 2.0.3** dağıtımı ve jsdom 26.1.0 ile `tests/rich-editor-dom.cjs`: **23 kontrol geçti**. Anında WYSIWYG, Türkçe araçlar, biçim değişikliğinin input/autosave'a iletilmesi, gerçek undo/redo, yazı tipi/renk/hizalama, Delta round-trip, görünür alana hata/odak, salt okunur kilit ve zengin yapıştırma kontrol edildi. Taklit editör kullanılmadı; jsdom görsel yerleşim testi değildir.

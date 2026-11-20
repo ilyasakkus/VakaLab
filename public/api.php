@@ -5,9 +5,9 @@ ApiRuntime::start();
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: same-origin');
 try{
     $config=cfg();demand($config['env']!=='production'||$config['https'],'Üretimde HTTPS zorunlu',503);
-    $db=new Db($config);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
+    $db=new Db($config);Migration::forums($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
     if($_SERVER['REQUEST_METHOD']==='POST'){$auth->csrf();demand((int)($_SERVER['CONTENT_LENGTH']??0)<=1048576,'İstek çok büyük',413);$p=obj(file_get_contents('php://input'));}
-    $writes=['login','register','logout','preview','start','save','initial','submit','chat','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic'];
+    $writes=['login','register','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic'];
     if(in_array($op,$writes,true))demand($_SERVER['REQUEST_METHOD']==='POST','POST gerekli',405);
     if($op==='token'){$result=['csrf'=>$_SESSION['csrf']];}
     elseif($op==='login'){$u=$auth->login($p['login']??'',$p['password']??'');$result=['role'=>$u['role'],'csrf'=>$_SESSION['csrf']];}
@@ -25,6 +25,8 @@ try{
         case 'start':$result=$app->start($u,$p['case_id']);break;
         case 'view':$result=$app->view($u,$id);break;
         case 'save':case 'initial':case 'submit':$result=$app->save($u,$id,$p,$op);break;
+        case 'forum':$result=(new Forum($app))->listing($u,$id,(string)($_GET['phase']??''),(string)($_GET['after']??''));break;
+        case 'forum_post':$result=(new Forum($app))->post($u,$id,$p);break;
         case 'chat':$result=$app->chat($u,$id,$p);break;
         case 'events':$result=(new Telemetry($app))->ingest($u,$id,$p,$session);break;
         case 'dashboard':$result=(new Admin($app))->dashboard($u);break;

@@ -49,5 +49,20 @@ final class Migration {
                 $db->insert('schema_migrations',['version'=>3,'applied_at'=>now()]);
             }
         }
+        self::forums($db);
+    }
+
+    // Additive and retryable: safe on existing installs and concurrent first requests.
+    public static function forums(Db $db): void {
+        if($db->one('SELECT version FROM schema_migrations WHERE version=4'))return;
+        demand((bool)$db->one('SELECT version FROM schema_migrations WHERE version=3'),'Önce mevcut veritabanı migration işlemlerini tamamlayın',503);
+        $apply=function()use($db){
+            if($db->one('SELECT version FROM schema_migrations WHERE version=4'))return;
+            foreach(explode(';',file_get_contents(__DIR__.'/../migrations/004.sql')) as $sql)if(trim($sql)!=='')$db->pdo->exec($sql);
+            foreach($db->all('SELECT id FROM cases') as $case)Forum::ensure($db,$case['id']);
+            $tail=$db->sqlite()?' ON CONFLICT(version) DO NOTHING':' ON DUPLICATE KEY UPDATE version=version';
+            $db->q('INSERT INTO schema_migrations (version,applied_at) VALUES (4,?)'.$tail,[now()]);
+        };
+        if($db->sqlite())$db->tx($apply);else $apply();
     }
 }

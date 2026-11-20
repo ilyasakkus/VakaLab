@@ -13,10 +13,7 @@ final class HolisticReview {
         demand($definition['family']==='rubric'&&!$definition['archived']&&!$definition['deleted_at'],'Etkin bir rubrik seçin');
         $rubric=obj($definition['body']);Rules::rubric($rubric);$draft=obj($a['draft']);Rules::submitted($draft);
         $case=$this->app->db->one('SELECT body FROM case_versions WHERE id=?',[$a['version_id']]);$questions=[];$sources=[];
-        foreach(Review::QUESTIONS as $step=>$items)foreach($items as $key=>$question){
-            $answer=$draft[$key]??'';$sources[$key]=$answer;
-            $questions[]=['source_id'=>$key,'section'=>[3=>'Başlangıç değerlendirmesi',4=>'Nihai değerlendirme',6=>'Yansıtma'][$step],'question'=>$question,'answer'=>$answer];
-        }
+        $questions=Forum::reviewQuestions($this->app->db,$a);foreach($questions as $question)$sources[$question['source_id']]=$question['answer'];
         return ['task'=>'holistic_review','review_version'=>3,'report_layout'=>'questions-v1','case'=>$case['body'],'rubric'=>$rubric,'rubric_id'=>$rubricId,'rubric_name'=>$definition['name'],'question_answers'=>$questions,'sources'=>$sources,'profile_comparison'=>(new Review($this->app))->profile($draft)];
     }
     private function latest(string $id): ?array {

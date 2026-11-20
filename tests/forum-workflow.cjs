@@ -1,0 +1,32 @@
+/* Real application render/handlers + actual editor; persistence API is isolated. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {JSDOM}=require(process.env.JSDOM_PATH||'jsdom'),root=path.resolve(__dirname,'..');
+const dom=new JSDOM('<!doctype html><body data-ui-role="student"><main id="root"></main><div id="notice"></div></body>',{url:'https://vakalab.test/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,context=dom.getInternalVMContext();
+w.TextEncoder=TextEncoder;w.Range.prototype.getBoundingClientRect=()=>({top:0,bottom:0,left:0,right:0,width:0,height:0});w.Range.prototype.getClientRects=()=>[];w.HTMLElement.prototype.scrollIntoView=function(){};w.scrollTo=()=>{};
+const run=s=>vm.runInContext(s,context),tick=()=>new Promise(resolve=>setTimeout(resolve,5));let count=0;
+const check=(ok,label)=>{assert.ok(ok,label);console.log(`PASS FORUM WORKFLOW ${++count} ${label}`);};
+(async()=>{try{
+ for(const file of ['vendor/quill-2.0.3/quill.js','editor.js','forum.js','validation.js','app.js'])run(fs.readFileSync(path.join(root,'public/assets',file),'utf8').replace(/init\(\)\.catch\(e=>notify\(e\.message\)\);\s*$/,''));
+ run(`me={id:'student',config:{autosave_ms:100000}};work={application:{id:'app',state:'initial',initial_at:null,attempt_no:1},draft:{knowledge:5,confidence:7,difficulty:4,severity:8,problem:'Problem',decision:'Karar',reason:'Gerekçe',final_decision:'Son karar',final_reason:'Son gerekçe',final_confidence:8,final_difficulty:4,final_severity:8,reflection:'Yansıtma'},version:{version:1},messages:[],reports:[],forum_participation:{before:0,after:0}};
+ window.saved=[];window.forumRows=[];event=()=>{};syncChat=()=>{};scheduleSave=()=>{dirty=true;};confirmStudent=async()=>true;
+ save=async(action='save')=>{saved.push(action);dirty=false;if(action==='initial'){work.application.initial_at='2026-11-20';work.application.state='working';}if(action==='submit'){work.application.state='submitted';work.application.submitted_at='2026-11-20';}};
+ api=async(op,p,q)=>op==='forum'?{can_read:true,can_post:q.phase==='before'?!work.application.initial_at:true,posts:forumRows.filter(row=>row.phase===q.phase),own_post_count:forumRows.filter(row=>row.phase===q.phase).length,has_more:false}:op==='forum_post'?{post:(()=>{const post={phase:p.phase,id:'f'+forumRows.length,author_id:me.id,author:'Öğrenci',is_own:true,parent_id:p.parent_id,body:p.body,rich_text:p.rich_text,created_at:'2026-11-20T10:00:00Z'};forumRows.push(post);return post;})()}:{};
+ section='initial';renderWork();`);
+ await run('forumViews[0].ready');
+ check(!['problem','decision','reason'].some(id=>w.document.querySelector('#'+id))&&w.document.querySelectorAll('.ql-editor').length===1,'before section has one forum composer and no individual answer inputs');
+ check(w.document.querySelectorAll('.forum-questions h4').length===3&&w.document.querySelector('[data-section=initial]').textContent.includes('Genel Tartışma Forumu (Önce)'),'three question headings guide discussion inside correctly named step');
+ run("VakaEditor.get(document.querySelector('#forum_body_before')).insertText(0,'Ortak görüş','user')");
+ check(run("work.draft.problem==='Problem'&&!('forum_body_before' in work.draft)&&!dirty"),'forum typing never overwrites or autosaves individual answer fields');
+ w.document.querySelector('#initial').click();await tick();check(run("!saved.includes('initial')&&!work.application.initial_at"),'unsent before draft blocks irreversible initial confirmation');
+ await w.document.querySelector('[data-forum-send]').onclick();w.document.querySelector('#initial').click();await tick();
+ check(run("saved.includes('initial')&&section==='ai'"),'sharing before post permits normal initial confirmation and private AI step');
+ await run("navigateWork('final')");await run('forumViews[0].ready');
+ check(w.document.querySelector('#case-forum h3').textContent.endsWith('(Sonra)')&&!w.document.querySelector('#final_decision')&&!w.document.querySelector('#final_reason')&&w.document.querySelectorAll('.forum-questions h4').length===1&&w.document.querySelector('.forum-questions h4').textContent==='Nihai kararınız nedir?','after step has only final question prompt and shared forum composer');
+ check(run("missingFields('submit').includes('forum_after')&&!missingFields('submit').includes('final_decision')"),'final validation requires forum contribution, not removed individual fields');run("VakaEditor.get(document.querySelector('#forum_body_after')).insertText(0,'Nihai paylaşılan görüş','user')");await w.document.querySelector('[data-forum-send]').onclick();run("VakaEditor.get(document.querySelector('#forum_body_after')).insertText(0,'Sonra taslağı','user')");await run("navigateWork('reflection')");await run("navigateWork('confirm')");
+ check(run("forumViews.length===0&&forumDraftPending('after')"),'after draft remains detectable from final-submit step after editor teardown');
+ w.document.querySelector('#submit').click();await tick();await run('forumViews[0].ready');
+ check(run("section==='final'&&!saved.includes('submit')")&&w.document.querySelector('.ql-editor').textContent.includes('Sonra taslağı'),'submission returns to after draft instead of silently trapping it');
+ await w.document.querySelector('[data-forum-clear]').onclick();await run("navigateWork('confirm')");check(!w.document.querySelector('#submit').disabled,'own forum response satisfies final-answer validation');await run("navigateWork('final')");await run('forumViews[0].ready');run("VakaEditor.get(document.querySelector('#forum_body_after')).insertText(0,'Nihai görüşüm','user')");await w.document.querySelector('[data-forum-send]').onclick();await run("navigateWork('confirm')");w.document.querySelector('#submit').click();await tick();
+ check(run("saved.includes('submit')&&work.application.state==='submitted'"),'sharing own final forum response permits submission without individual answer boxes');
+ console.log(`TOTAL FORUM WORKFLOW ${count} checks; actual app handlers and Quill, mocked API.`);
+}finally{run('destroyForums();VakaEditor.destroyAll();');dom.window.close();}})().catch(error=>{console.error(error);process.exitCode=1;});
