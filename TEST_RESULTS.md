@@ -1,5 +1,12 @@
 # Gerçek test sonuçları — 2026-10-20
 
+## AI yapılandırması, editör ve adım okları — 2026-11-20
+
+- `node tests/student-editor.cjs`: **45 kontrol geçti**. Metin/Unicode/seçim koruması, Markdown önizlemesinde HTML kaçışları, boş alana sahte yanıt eklenmemesi, geri al/yinele, textarea ile otomatik kayıt sözleşmesi, salt okunur alanlar, adım sınırları, kayıt hatası, çift tıklama ve bölüm telemetrisi sınandı. Birim kontrolleri ve DOM/API test ikizleridir.
+- `node tests/auth-preview-ui.cjs`: mevcut **17 kontrol geçti**. Değişen JavaScript dosyaları `node --check` ve `git diff --check` ile kontrol edildi.
+- `php tests/ai-config.php`: 13 bağımsız yapılandırma kontrolü eklendi; **çalıştırılmadı**, bu makinede PHP yok. Gizli anahtarlar veya canlı sağlayıcı kullanılmaz.
+- Gerçek API/HTTP ve görsel tarayıcı kabulü yapılmadı. Görsel kontrol için yerel UI test sunucusu başlatma denemesi ortamın soket açma kısıtı nedeniyle başlayamadı. Deploy yapılmadı.
+
 ## Öğrenci kaydı ve önizleme — 2026-11-19
 
 - `node tests/auth-preview-ui.cjs`: **17 kontrol geçti**. DOM/API test ikizleriyle form geçişleri, numara normalizasyonu, çift gönderim engeli, hata sonrası alanların korunması, kayıt sonrası oturum bilgisi, şifre tekrarı, önizleme sekmesi/tokenı ve çıkış telemetrisi kontrol edildi. Gerçek tarayıcı veya PHP çalışması değildir.

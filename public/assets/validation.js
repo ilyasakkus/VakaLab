@@ -39,6 +39,7 @@ function goToRequiredField(key, scope) {
     event('section_open', {reason:'validation', field:key});
     const input = document.getElementById(key);
     if (input) {
+        if (typeof VakaEditor !== 'undefined') VakaEditor.focus(input);
         input.focus({preventScroll:true});
         const headerHeight = document.querySelector('.workspace-top')?.getBoundingClientRect().height || 0;
         // Leave the label and field below the sticky navigation, including on mobile.

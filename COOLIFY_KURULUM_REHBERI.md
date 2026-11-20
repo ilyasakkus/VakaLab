@@ -126,9 +126,18 @@ Siteniz açıldığında sağ üstten veya giriş ekranından giriş yapabilirsi
 * **Çözüm:** Şifrenizi `GucluSifre2026!+` gibi 14 karakterden uzun yapın.
 
 ### 3. Yapay Zekâ (AI) API Ayarları:
-Canlıda OpenAI veya OpenRouter kullanmak isterseniz Coolify Environment Variables alanına şunları ekleyebilirsiniz:
-* `AI_PROVIDER`: `compatible`
-* `AI_ENDPOINT`: `https://openrouter.ai/api/v1/chat/completions` (veya OpenAI endpoint'i)
-* `AI_KEY`: `sk-or-v1-...`
-* `AI_MODEL`: `openai/gpt-4o-mini` (veya istediğiniz model)
-* `AI_TIMEOUT`: `90`
+OpenAI için Coolify Environment Variables alanına şunları ekleyin; değişiklikten sonra uygulamayı yeniden deploy edin:
+
+```text
+AI_PROVIDER=compatible
+AI_ENDPOINT=https://api.openai.com/v1/chat/completions
+OPENAI_API_KEY=OPENAI_ANAHTARINIZ
+OPENAI_MODEL=HESABINIZDA_KULLANDIGINIZ_MODEL
+AI_TIMEOUT=90
+```
+
+`OPENAI_API_KEY` yerine `AI_KEY`, `OPENAI_MODEL` yerine `AI_MODEL` kullanılabilir. İki isim birlikte tanımlanırsa `AI_KEY` / `AI_MODEL` önceliklidir. Model kimliği seçtiğiniz sağlayıcının kabul ettiği kimlik olmalıdır; uygulama sizin yerinize bir model seçmez. `OPENAI_BASE_URL` kullanırsanız `/v1` içeren taban adresi verin; `/chat/completions` eklenir.
+
+Anahtar varsa ve `AI_PROVIDER` verilmemişse gerçek sağlayıcı otomatik seçilir. `AI_PROVIDER=mock` açıkça tanımlıysa bu seçim korunur; gerçek AI için bu değeri `compatible` yapın. Anahtar/model eksikliği veya API hatası sentetik yanıta dönüştürülmez. Admin panelinin başındaki **AI sağlayıcısı / Model** satırı etkin yapılandırmayı anahtarı göstermeden belirtir; bu satır canlı bağlantı testi değildir.
+
+OpenRouter için `AI_ENDPOINT=https://openrouter.ai/api/v1/chat/completions`, `AI_KEY` ve OpenRouter model kimliğini içeren `AI_MODEL` kullanın. `AI_PROVIDER=openai` ve `AI_PROVIDER=openrouter` kısaltmaları da desteklenir. `AI_STRUCTURED_OUTPUTS=true` yalnız seçtiğiniz model/sağlayıcı bu sözleşmeyi destekliyorsa kullanılmalıdır.

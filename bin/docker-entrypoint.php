@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require __DIR__.'/../app/bootstrap.php';
 
 echo ">> config/local.php ortam değişkenlerinden hazırlanıyor...\n";
 
@@ -24,7 +25,7 @@ $env = trim(getenv('APP_ENV') ?: 'test');
 $https = getenv('APP_HTTPS') !== false ? filter_var(getenv('APP_HTTPS'), FILTER_VALIDATE_BOOLEAN) : true;
 $basePath = trim(getenv('APP_BASE_PATH') ?: '');
 
-$aiProvider = trim(getenv('AI_PROVIDER') ?: 'mock');
+$aiProvider = trim(getenv('AI_PROVIDER') ?: 'auto');
 $aiModel = trim(getenv('AI_MODEL') ?: 'synthetic-v1');
 $aiEndpoint = trim(getenv('AI_ENDPOINT') ?: 'https://api.openai.com/v1/chat/completions');
 $aiKey = trim(getenv('AI_KEY') ?: '');
@@ -55,6 +56,9 @@ $config = [
     'consent_text' => getenv('CONSENT_TEXT') ?: 'Kurum tarafından onaylanmış onam metni henüz sağlanmadı. Bu ortam test içindir.',
 ];
 
+$config = AiConfig::resolve($config);
+$aiStatus = AiConfig::status($config);
+echo '>> AI sağlayıcısı: ' . $aiStatus['label'] . ' · Model: ' . ($aiStatus['model'] ?: 'AYARLANMADI') . "\n";
 $export = "<?php\n// Otomatik üretildi (Coolify / Docker Ortam Değişkenleri)\nreturn " . var_export($config, true) . ";\n";
 file_put_contents(__DIR__ . '/../config/local.php', $export);
 echo ">> config/local.php başarıyla hazırlandı.\n";

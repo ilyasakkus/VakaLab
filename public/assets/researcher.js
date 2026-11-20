@@ -64,7 +64,7 @@ function saveJsonFile(filename,data){const url=URL.createObjectURL(new Blob([JSO
 
 async function adminHome(){
     dash=await api('dashboard');
-    $('#root').innerHTML=`<div class="eyebrow">Araştırmacı paneli · ${esc(me.login)}</div><h1>Çalışma alanım</h1><p class="intro">Vakalarınızı, katılımcılarınızı ve değerlendirmelerinizi yönetin.</p><nav class="tabs">${[['overview','Genel durum'],['participants','Kullanıcılar'],['cases','Vakalar ve atamalar'],['definitions','Rubrikler ve etiketler'],['exports','Veri indirme'],['system','İşlem geçmişi']].map(([k,l])=>`<button data-admin-tab="${k}" class="${adminTab===k?'active':''}">${l}</button>`).join('')}</nav><div id="admin-body" class="spaced"></div>`;
+    $('#root').innerHTML=`<div class="eyebrow">Araştırmacı paneli · ${esc(me.login)}</div><h1>Çalışma alanım</h1><p class="intro">Vakalarınızı, katılımcılarınızı ve değerlendirmelerinizi yönetin.</p>${me.ai_status?`<p class="muted" id="ai-config-status">AI sağlayıcısı: <strong>${esc(me.ai_status.label)}</strong>${me.ai_status.model?` · Model: ${esc(me.ai_status.model)}`:''}${!me.mock&&!me.ai_status.ready?' · API anahtarı, model ve HTTPS adresi ayarlarını kontrol edin.':''}</p>`:''}<nav class="tabs">${[['overview','Genel durum'],['participants','Kullanıcılar'],['cases','Vakalar ve atamalar'],['definitions','Rubrikler ve etiketler'],['exports','Veri indirme'],['system','İşlem geçmişi']].map(([k,l])=>`<button data-admin-tab="${k}" class="${adminTab===k?'active':''}">${l}</button>`).join('')}</nav><div id="admin-body" class="spaced"></div>`;
     document.querySelectorAll('[data-admin-tab]').forEach(b=>b.onclick=()=>{adminTab=b.dataset.adminTab;adminHome().catch(e=>notify(e.message));});renderAdmin();
 }
 function renderAdmin(){

@@ -8,7 +8,7 @@ spl_autoload_register(function(string $name): void {
 if (is_file(__DIR__.'/../vendor/autoload.php')) require __DIR__.'/../vendor/autoload.php';
 function cfg(): array {
     static $config;
-    return $config ??= require (getenv('VAKALAB_CONFIG') ?: __DIR__.'/../config/local.php');
+    return $config ??= AiConfig::resolve(require (getenv('VAKALAB_CONFIG') ?: __DIR__.'/../config/local.php'));
 }
 function uid(): string { return bin2hex(random_bytes(16)); }
 function now(): string { return (new DateTimeImmutable('now',new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.u\Z'); }

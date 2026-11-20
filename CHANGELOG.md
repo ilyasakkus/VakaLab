@@ -1,5 +1,11 @@
 # Değişiklik günlüğü
 
+## 2026-11-20 — Gerçek AI ayarları, yanıt editörü ve adım okları
+
+Sunucu ayarları ortak bir çözümleyiciden geçer. `AI_*` yanında `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` ve `OPENAI_API_URL` desteklenir. Anahtar girilmişken örnek config'in varsayılan mock değeri nedeniyle sentetik modda kalma düzeltildi; ortam değişkeniyle açık mock seçimi korunur. Gerçek sağlayıcıya sentetik model adı gönderilmez; model seçilmediyse ayar hatası verilir. Uygulama ve başlangıç logu anahtarı göstermeden etkin sağlayıcı/modeli belirtir. API hataları mock yanıta düşmez.
+
+Öğrenci yanıt alanlarına yerel Markdown editörü eklendi; biçimlendirme, önizleme, sınırlı geri alma geçmişi ve klavye kısayolları mevcut textarea/input/autosave sözleşmesini kullanır. Önizlemede ham HTML ve bağlantılar çalıştırılmaz. Kesinleşmiş yanıtların editör araçları kapalıdır. Sağ üstteki adım okları, adım sekmeleriyle aynı kayıt/geçiş işlevini kullanır; kayıt hatası ve ilk/son adım sınırları korunur. Eksik alan bağlantısı önizleme modundaki editörü yazma moduna döndürüp odaklar. Şema değişikliği yok.
+
 ## 2026-11-19 — Öğrenci kaydı, şifre sıfırlama ve tam öğrenci önizlemesi
 
 Giriş ekranına öğrenci numarası, ad, soyad ve şifreyle hesap oluşturma eklendi. Öğrenci numarası metin olarak tutulur, baştaki sıfırlar kaldırılır; mükerrer numara, geçersiz alanlar ve aşırı kayıt denemeleri reddedilir. Kayıt yalnız öğrenci rolü üretir; öğrenciler yapılandırılan veya ilk etkin araştırmacıya bağlanır. CSRF ve oturum kimliği kayıt sonrası yenilenir.
