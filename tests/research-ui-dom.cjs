@@ -1,0 +1,34 @@
+/* Actual researcher UI and PHP-generated study fixture; network/dialog layout are test doubles. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {JSDOM}=require(process.env.JSDOM_PATH||'jsdom'),root=path.resolve(__dirname,'..'),fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'tmp/research-ui-fixture.json'),'utf8'));
+const dom=new JSDOM('<!doctype html><body><main id="root"></main><div id="notice"></div></body>',{url:'https://vakalab.test/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,ctx=dom.getInternalVMContext();
+w.fixture=fixture;w.TextEncoder=TextEncoder;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=function(){};w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};const opened=[];w.open=url=>opened.push(new URL(url,w.location.href));
+const run=s=>vm.runInContext(s,ctx),tick=()=>new Promise(resolve=>setTimeout(resolve,10));let checks=0;const check=(ok,label)=>{assert.ok(ok,label);console.log(`PASS STUDY UI ${++checks} ${label}`);};
+(async()=>{try{
+ for(const file of ['time.js','analysis.js','labels.js','vendor/quill-2.0.3/quill.js','editor.js','forum.js','validation.js','researcher.js','research-forum.js','process.js','review.js','holistic.js','research.js','app.js'])run(fs.readFileSync(path.join(root,'public/assets',file),'utf8').replace(/init\(\)\.catch\(e=>notify\(e\.message\)\);\s*$/,''));
+ run(`me={id:'test-researcher',role:'researcher',config:{timezone:'Europe/Istanbul'}};dash=fixture.dashboard;window.calls=[];api=async(op,p,q)=>{calls.push({op,p,q});return op==='research_data'?fixture.overview:op==='dashboard'?fixture.dashboard:op==='view'?fixture.view:op==='forum'?{posts:[],can_read:true,can_post:false,has_more:false}:{id:'saved'};};VakaStudy.choice.case_id=fixture.view.application.case_id;VakaStudy.choice.include_test=true;adminTab='research';`);
+ await run('adminHome()');await tick();const $=s=>w.document.querySelector(s),all=s=>[...w.document.querySelectorAll(s)];
+ check($('[data-admin-tab=research]')&&$('.study-workspace'),'research tab integrated with actual admin navigation');
+ check($('#study-quality').textContent.includes('ICAP ve diziler')&&$('#study-quality').textContent.includes('Haftası eksik vaka'),'data quality visible for multiple research methods');
+ check($('#study-week-filter')&&$('#study-group-filter')&&$('#study-attempt'),'week, group and attempt scopes are user-controlled');
+ check(all('#study-network option').some(o=>o.textContent.includes('5 izole')),'graph layer selector preserves silent assigned students');
+ $('#study-zip').click();$('#study-json').click();$('#study-graphml').click();await tick();
+ check(opened.some(u=>u.searchParams.get('format')==='research_zip')&&opened.some(u=>u.searchParams.get('format')==='research_json'),'ZIP and JSON exports use dedicated study routes');
+ check(opened.find(u=>u.searchParams.get('format')==='graphml').searchParams.get('layer_id')=== $('#study-network').value,'GraphML download selects one explicit network layer');
+ check(opened[0].searchParams.get('include_test')==='1'&&opened[0].searchParams.get('include_text')==='1','scope and content choices included explicitly in export request');
+ const cid=fixture.view.application.case_id;$('[data-study-settings="'+cid+'"]').click();await tick();
+ check($('dialog').textContent.includes('Kim vd.')&&$('#study-week').value==='W02','case metadata form includes week and five framework documentation fields');
+ $('#study-week').value='W03';$('#study-reason').value='Pilot hafta eşlemesini düzelttim.';$('#commit').click();await tick();
+ check(run("calls.some(c=>c.op==='research'&&c.p.action==='settings'&&c.p.week_id==='W03'&&c.p.reason==='Pilot hafta eşlemesini düzelttim.')"),'metadata edits preserve an explicit reason');
+ const d=fixture.overview.dialogues[0];for(const member of d.posts)$('[data-study-select="'+member.post_id+'"]').click();$('#study-new-dialogue').click();await tick();$('#study-dialogue-label').value='Yeni inceleme birimi';$('#study-dialogue-rationale').value='Bağlantılı karşılıklı fikir geliştirme zincirini inceliyorum.';$('#commit').click();await tick();
+ const created=run("calls.find(c=>c.op==='research'&&c.p.action==='dialogue')");check(created.p.post_ids.join(',')===d.posts.map(p=>p.post_id).join(','),'human dialogue selection preserves parent-first chosen sequence');
+ $('[data-study-post-code="'+d.posts[0].post_id+'"]').click();await tick();
+ check($('#icap-code').querySelector('[value=I]')&&$('#icap-dialogue').querySelector('[value="'+d.id+'"]')&&$('#icap-interactive'),'Interactive entry requires explicit dialogue and human review');
+ $('#icap-code').value='I';$('#icap-dialogue').value=d.id;$('#icap-interactive').checked=true;$('#icap-coder').value='Uzlaşı';$('#icap-round').value='2';$('#icap-status').value='consensus';$('#icap-evidence').value='Karşılıklı katkılar içerikte açık biçimde birbirini geliştiriyor.';$('#commit').click();await tick();
+ check(run("calls.some(c=>c.op==='research'&&c.p.action==='annotation'&&c.p.code==='I'&&c.p.evidence_dialogue_id&&c.p.interactive_reviewed&&c.p.round_no===2&&c.p.status==='consensus')"),'coding request carries coder round, evidence and explicit consensus');
+ await run('processView(fixture.view.application.id,null,fixture.view)');
+ check($('.study-context').textContent.includes('Hafta: W02')&&$('.study-context').textContent.includes('Grup A'),'student file shows actual study metadata');
+ check($('[data-research-phase=before]').textContent.includes('ICAP: I'),'student message cards show explicit resolved code');
+ $('#process-study').click();await tick();check($('.study-workspace')&&$('#study-case').value===cid,'student detail opens correct case in study workspace');
+ console.log(`TOTAL STUDY UI ${checks} checks; actual JS/Quill, PHP study fixture, mocked network.`);
+}finally{run('destroyForums();VakaEditor.destroyAll();');dom.window.close();}})().catch(error=>{console.error(error);process.exitCode=1;});

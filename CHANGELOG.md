@@ -1,5 +1,18 @@
 # Değişiklik günlüğü
 
+## 2026-11-20 — Çok yöntemli araştırma verisi ve hazır analiz çıktıları
+
+Paylaşılan altı haftalık çalışma planına göre Araştırma / Analiz sekmesi eklendi. Vaka haftası, gerçek tartışma topluluğunun grup kimliği, protokol sürümü ve vaka geliştirme boyutlarının notları sürümlenir. Migration 005; grup/ayar, mesaj bağlamı/sırası, bağlı diyalog ve gerekçeli kodlayıcı kararları tablolarını ekler. Eski kayıtlara veri yakıştırılmaz.
+
+Araştırmacı mesaj veya diyalog kodlayabilir; Interactive için bağlı çok katılımcılı kanıt diyaloğu ve insan inceleme işareti gerekir. Ayrı kodlayıcılar/turlar korunur, yeni karar eskisini silmez. Diziler en yüksek turdaki açık uzlaşıyı kullanır; çatışma/eksik kod boş kalır. Odaklı ekranda kısmi mesaj kartı görünürlüğü gözlemi eklendi; okuma veya otomatik ICAP çıkarımı yapılmaz.
+
+Gephi için düğüm/kenar CSV ve GraphML katmanları; içerik/kodlama formları, ayrı öğrenci/diyalog dizileri, PM4Py kolonlarıyla bireysel/grup günlükleri, AI/yansıtma kanalları, vaka/ayar sürümleri ve kalite manifesti ZIP/JSON olarak indirilir. Ağlara izole atanmış öğrenciler dahil edilir; öz yanıtlar ana ağdan çıkarılıp ham tabloda korunur. Kapsam/deneme/hafta/grup ve metin dahil etme seçenekleri açıktır. Serbest metinlerin tam anonimleştirildiği iddia edilmez; geçmiş materyal inceleme/revizyon olayları üretilmez.
+## 2026-11-20 — Admin öğrenci dosyası ve işlem kayıtlarının forum akışına uyarlanması
+
+Öğrenci dosyasına denemeye özel Önce/Sonra mesajları, gelen akran yanıtları, üst mesaj bağlamı, etkileşim sayıları ve kesinleşmiş katkı metinleri eklendi. Profil/yansıtma görünümü kaldırılmış bireysel yanıtlar için boş satırlar üretmez. Forumlar, bireysel AI sohbeti ve sınıfın ortak tartışması ayrı gösterilir. Değerlendirme ekranında öğrencinin yalnız kendi kesinleşmiş katkılarının kaynak alındığı açıklanır. Yenilemede açık paneller ve log filtreleri korunur.
+
+Yeni forum gözlemleri Türkçe açıklamalara bağlandı; taslak metni olay kaydına alınmaz. İşlem çizelgesi gerçek forum gönderimlerini sunucu audit kayıtlarından gösterir, aynı post_id için tarayıcı bildirimlerini tekilleştirir. Ziyaret ve CSV adları çalışma düzenine göre seçilir; eski bireysel kayıtlar aynı adları kullanmaya devam eder. Sunucuda saklanan her forum gönderimi süreç verisine 0 saniyelik tek olay olarak girer; yazma/okuma süresi uydurulmaz. JSON/Excel veri paketi doğrudan yanıt bağlantıları ve aşama istatistiklerini içerir; kodlanmış ağ verisi katılımcı kodları kullanır. Anahtarlar, mevcut yanıtlar ve eski olay kodları değiştirilmedi; yeni migration gerekmez.
+
 ## 2026-11-20 — Soruların forum tartışma başlığına dönüştürülmesi
 
 Stepper'daki başlangıç ve nihai değerlendirme sekmeleri Genel Tartışma Forumu (Önce)/(Sonra) olarak adlandırıldı. Üç başlangıç sorusu ve tek nihai karar sorusu ilgili forumun içinde yönlendirici başlık olarak gösterilir; ayrı bireysel yanıt editörleri kaldırıldı. Yeni arayüz `draft.response_mode=forum` kullanır. Geçiş/teslimde gizli kalmış bireysel alanlar istenmez; ilgili forumda öğrencinin en az bir kendi mesajı veya yanıtı doğrulanır. Profil/güven ölçümleri ve yansıtma korunur.

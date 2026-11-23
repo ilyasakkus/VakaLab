@@ -106,6 +106,11 @@ final class Navigation {
             $rows[]=['app_id'=>$m['app_id'],'activity_id'=>$m['id'].'-server-message','visit_id'=>'','trace_id'=>'','visit_number'=>null,'activity'=>$activity,'activity_code'=>'AI_MESSAGE','activity_type'=>'ai_question_legacy','section'=>'ai','start_at'=>$m['created_at'],'end_at'=>null,'start_event_id'=>$m['id'],'end_event_id'=>null,'start_sequence'=>(int)$m['seq'],'message_id'=>$m['id'],'message_sequence'=>(int)$m['seq'],'duration_seconds'=>null,'quality'=>'server_message_only','timestamp_source'=>'server_message','end_reason'=>'missing_client_send','next_section'=>null,'next_section_name'=>null,'edited_fields'=>[],'ai_question_count'=>1,'ai_labels'=>$resolve($state['ai']),'researcher_labels'=>$resolve($state['researcher']),'effective_labels'=>$resolve($state['effective']),'label_sources'=>[$state['source']],'background_seen'=>null,'locked'=>false,'read_only_tab'=>false,'missing_events'=>true,'overlapping_tab'=>false];
         }
         $rows=self::presenceActivities($rows,$visits);
+        // A saved forum message is a server point, never an inferred reading/writing duration.
+        foreach($data['forum_posts']??[] as $post){
+            $phase=$post['phase'];$title='Genel Tartışma Forumu ('.($phase==='before'?'Önce':'Sonra').')';
+            $rows[]=['app_id'=>$post['app_id'],'activity_id'=>$post['id'].'-forum-post','visit_id'=>'','trace_id'=>'server-forum','visit_number'=>null,'activity'=>$title.' · '.($post['parent_id']?'Yanıt paylaştı':'Yeni mesaj paylaştı'),'activity_code'=>$post['parent_id']?'FORUM_REPLY':'FORUM_POST','activity_type'=>'forum_post','section'=>$phase==='before'?'initial':'final','start_at'=>$post['created_at'],'end_at'=>$post['created_at'],'start_event_id'=>$post['id'],'end_event_id'=>$post['id'],'start_sequence'=>0,'duration_seconds'=>0.0,'quality'=>'server_confirmed','timestamp_source'=>'server_forum_post','timeline_lane'=>'student','end_reason'=>'forum_posted','next_section'=>null,'next_section_name'=>null,'edited_fields'=>[],'ai_question_count'=>0,'ai_labels'=>[],'researcher_labels'=>[],'effective_labels'=>[],'label_sources'=>[],'background_seen'=>null,'locked'=>false,'read_only_tab'=>false,'missing_events'=>false,'overlapping_tab'=>false,'forum_phase'=>$phase,'forum_post_id'=>$post['id'],'parent_post_id'=>$post['parent_id']];
+        }
         usort($rows,fn($a,$b)=>[self::time($a['start_at'])??PHP_FLOAT_MAX,$a['trace_id'],$a['start_sequence'],$a['boundary_order']??0]<=>[self::time($b['start_at'])??PHP_FLOAT_MAX,$b['trace_id'],$b['start_sequence'],$b['boundary_order']??0]);
         foreach($rows as $i=>&$row){$row['sequence']=$i+1;$row['activity_id']??=$row['visit_id'];}unset($row);return $rows;
     }
@@ -147,7 +152,8 @@ final class Navigation {
         }
         return $result;
     }
-    public static function build(array $events,?string $submittedAt=null): array {
+    public static function build(array $events,?string $submittedAt=null,bool $forum=false): array {
+        $tabs=$forum?array_replace(self::TABS,['initial'=>'Genel Tartışma Forumu (Önce)','final'=>'Genel Tartışma Forumu (Sonra)']):self::TABS;
         $groups=[];$visits=[];$milestones=[];$cutoff=self::time($submittedAt);
         foreach($events as $event){$p=obj($event['payload']);$key=($event['session_id']??'').'/'.($event['tab_id']??'').'/'.($p['view_id']??'legacy');$groups[$key][]=$event;}
         foreach($groups as $key=>$items){
@@ -157,16 +163,16 @@ final class Navigation {
                 $p=obj($event['payload']);$number++;
                 $active=['visit_id'=>$event['id'].'-'.$section,'trace_id'=>substr(hash('sha256',$key),0,20),'visit_number'=>$number,'section'=>$section,'invalid_clock'=>$clockInvalid,'measurement_version'=>'presence-v2','presence_source'=>is_bool($p['app_active']??null)?'app_active':(is_bool($p['visible']??null)?'legacy_visibility':'unobserved'),'resume_section'=>$event['section'],'pending_request'=>$p['pending_request']??null,'start_at'=>$event['client_at']??null,'end_at'=>null,'start_event_id'=>$event['id'],'start_sequence'=>(int)$event['client_seq'],'edited_fields'=>[],'request_keys'=>[],'message_sends'=>[],'response_events'=>[],'locked'=>$section!=='outside'&&!empty($p['locked']),'read_only_tab'=>!empty($p['read_only_tab']),'background_seen'=>$section==='outside','missing_events'=>false];
             };
-            $finish=function(?array $end,string $reason)use(&$active,&$visits){
+            $finish=function(?array $end,string $reason)use(&$active,&$visits,$tabs){
                 if(!$active)return;
                 $endTime=$end?self::time($end['client_at']??null):null;$startTime=self::time($active['start_at']);
                 $active['end_at']=$end['client_at']??null;$active['end_event_id']=$end['id']??null;$active['end_sequence']=$end?(int)$end['client_seq']:null;$active['end_reason']=$reason;
                 $active['duration_seconds']=!$active['invalid_clock']&&$startTime!==null&&$endTime!==null&&$endTime>=$startTime?round($endTime-$startTime,6):null;
                 $active['quality']=$active['duration_seconds']===null?($end?'invalid_clock':'open_end'):($active['missing_events']?'event_gap':'presence_interval');
                 $active['next_section']=$reason==='next_section'?($end['section']??null):($reason==='app_outside'?'outside':($reason==='app_return'?($end['section']??null):null));
-                $active['next_section_name']=self::TABS[$active['next_section']]??null;
+                $active['next_section_name']=$tabs[$active['next_section']]??null;
                 $section=$active['section'];
-                $active['activity']=($section==='outside'?'Vaka sekmesi etkin değil':($active['locked']?($section==='ai'?'Kilitli AI bölümünü görüntüleme':'Kilitli '.(self::TABS[$section]??'bölüm').' bölümünü görüntüleme'):(self::TABS[$section]??'Bölüm').($active['edited_fields']?' güncelleme':' görüntüleme')));
+                $active['activity']=($section==='outside'?'Vaka sekmesi etkin değil':($active['locked']?($section==='ai'?'Kilitli AI bölümünü görüntüleme':'Kilitli '.($tabs[$section]??'bölüm').' bölümünü görüntüleme'):($tabs[$section]??'Bölüm').($active['edited_fields']?' güncelleme':' görüntüleme')));
                 if($section==='ai'&&!$active['locked'])$active['activity']=$active['request_keys']?'AI sohbeti · Mesaj gönderme denemesi':'AI sohbeti görüntüleme';
                 $active['activity_code']=$section==='outside'?'APP_OUTSIDE':($section==='ai'&&!$active['locked']?($active['request_keys']?'AI_SEND_ATTEMPT':'AI_VIEW'):strtoupper($section).($active['locked']?'_LOCKED':($active['edited_fields']?'_EDIT':'_VIEW')));
                 $visits[]=$active;$active=null;
@@ -200,7 +206,7 @@ final class Navigation {
                 }elseif($active){
                     if($event['type']==='response_visible'&&is_string($p['request']??null))$active['response_events'][]=['request_id'=>$p['request'],'status'=>$p['status']??'','at'=>$event['client_at']??null,'event_id'=>$event['id'],'sequence'=>(int)$event['client_seq']];
                     if($event['type']==='message_send'&&is_string($p['request_key']??null)&&!in_array($p['request_key'],$active['request_keys'],true)){$active['request_keys'][]=$p['request_key'];$active['message_sends'][]=['request_key'=>$p['request_key'],'at'=>$event['client_at']??null,'event_id'=>$event['id'],'sequence'=>(int)$event['client_seq']];}
-                    if(in_array($event['type'],['text_changed','profile_changed','question_changed'],true)&&$event['section']===$active['section']&&isset($p['field'])&&!in_array($p['field'],$active['edited_fields'],true))$active['edited_fields'][]=$p['field'];
+                    if(in_array($event['type'],['text_changed','profile_changed','question_changed','forum_draft_changed'],true)&&$event['section']===$active['section']&&isset($p['field'])&&!in_array($p['field'],$active['edited_fields'],true))$active['edited_fields'][]=$p['field'];
                 }
                 $previous=$event;
             }
@@ -217,7 +223,7 @@ final class Navigation {
                 if($to['trace_id']===$from['trace_id']||$to['read_only_tab']||$to['invalid_clock'])break;
                 $overlap=false;foreach($visits as $other){if($other['visit_id']===$from['visit_id']||$other['visit_id']===$to['visit_id'])continue;$a=self::time($other['start_at']);$b=self::time($other['end_at']);if($a!==null&&$b!==null&&$a<$start&&$b>$end){$overlap=true;break;}}
                 if($overlap||$start===$end)break;
-                $gap=$from;$gap['visit_id']=$from['visit_id'].'-away-'.$to['visit_id'];$gap['trace_id']=substr(hash('sha256',$gap['visit_id']),0,20);$gap['visit_number']=null;$gap['section']='away';$gap['activity']='Vaka dışında';$gap['activity_code']='CASE_AWAY';$gap['activity_type']='case_away';$gap['start_at']=$from['end_at'];$gap['end_at']=$to['start_at'];$gap['start_event_id']=$from['end_event_id'];$gap['end_event_id']=$to['start_event_id'];$gap['start_sequence']=$from['end_sequence']??0;$gap['end_sequence']=$to['start_sequence'];$gap['duration_seconds']=round($start-$end,6);$gap['quality']='observed_case_gap';$gap['presence_source']='home_and_reopen';$gap['end_reason']='case_return';$gap['next_section']=$to['section'];$gap['next_section_name']=self::TABS[$to['section']]??null;$gap['resume_section']=$to['resume_section'];$gap['locked']=false;$gap['background_seen']=false;$gap['pending_request']=null;$gap['edited_fields']=[];$gap['request_keys']=[];$gap['message_sends']=[];$gap['response_events']=[];$gap['missing_events']=false;$gaps[]=$gap;break;
+                $gap=$from;$gap['visit_id']=$from['visit_id'].'-away-'.$to['visit_id'];$gap['trace_id']=substr(hash('sha256',$gap['visit_id']),0,20);$gap['visit_number']=null;$gap['section']='away';$gap['activity']='Vaka dışında';$gap['activity_code']='CASE_AWAY';$gap['activity_type']='case_away';$gap['start_at']=$from['end_at'];$gap['end_at']=$to['start_at'];$gap['start_event_id']=$from['end_event_id'];$gap['end_event_id']=$to['start_event_id'];$gap['start_sequence']=$from['end_sequence']??0;$gap['end_sequence']=$to['start_sequence'];$gap['duration_seconds']=round($start-$end,6);$gap['quality']='observed_case_gap';$gap['presence_source']='home_and_reopen';$gap['end_reason']='case_return';$gap['next_section']=$to['section'];$gap['next_section_name']=$tabs[$to['section']]??null;$gap['resume_section']=$to['resume_section'];$gap['locked']=false;$gap['background_seen']=false;$gap['pending_request']=null;$gap['edited_fields']=[];$gap['request_keys']=[];$gap['message_sends']=[];$gap['response_events']=[];$gap['missing_events']=false;$gaps[]=$gap;break;
             }
         }
         $visits=array_merge($visits,$gaps);

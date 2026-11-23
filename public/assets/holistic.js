@@ -9,7 +9,7 @@ function holisticState(v){
     return {report,body,draft,rubrics,rubricId,rubric,questions:v.review_questions||body.questions||[]};
 }
 function holisticQuestionEditor(q,review,rubric,index){
-    return `<article class="question-review" data-question-id="${esc(q.source_id)}"><p class="eyebrow">${esc(q.section)}</p><h3>${index+1}. ${esc(q.question)}</h3><h4>Öğrencinin yanıtı</h4><div class="prose question-answer">${esc(q.answer||'Yanıt kaydı yok.')}</div>
+    return `<article class="question-review" data-question-id="${esc(q.source_id)}"><p class="eyebrow">${esc(q.section)}</p><h3>${index+1}. ${esc(q.question)}</h3><h4>${q.source_id.startsWith('forum_')?'Öğrencinin kendi forum katkıları':'Öğrencinin yanıtı'}</h4><div class="prose question-answer">${esc(q.answer||'Yanıt kaydı yok.')}</div>
     ${field('holistic-feedback-'+index,'Bu yanıta geri bildirim',review?.feedback||'','textarea')}
     <h4>Bu yanıtın rubrik puanları</h4>${(rubric?.dimensions||[]).map((d,i)=>`${select('holistic-level-'+index+'-'+i,d.name,[['','Düzey seçin'],...d.levels.map(l=>[l.name,l.name+' · '+l.score+' puan'])],review?.scores?.[d.id]?.level||'')}${field('holistic-reason-'+index+'-'+i,'Puanın gerekçesi (isteğe bağlı)',review?.scores?.[d.id]?.reason||'','textarea')}`).join('')}
     <p class="review-total" id="holistic-question-total-${index}"></p></article>`;
@@ -22,7 +22,7 @@ function renderHolisticReview(v){
     const reviews=draft?.reviews||body.question_reviews||{},text=draft?.text??body.report_text??'',legacy=report&&body.report_layout!=='questions-v1';
     const profile=body.profile||holisticProfile(processObject(v.application.draft));
     return `<section class="review-workspace holistic-workspace" data-review-version="3" data-analysis-run="${esc(run?.id||'manual')}" data-holistic-app="${esc(id)}">
-    <h3>Soru, yanıt, geri bildirim ve puan</h3><p>Her soruyu öğrencinin kendi yanıtıyla birlikte inceleyin. AI tüm soruları tek istekte değerlendirir ve tek rapor hazırlar. Geri bildirimleri ve puanları kendiniz de girebilir veya düzenleyebilirsiniz.</p>
+    <h3>${typeof VakaResearchForum!=='undefined'&&VakaResearchForum.isForum(v)?'Önce / Sonra katkıları, yansıtma ve değerlendirme':'Soru, yanıt, geri bildirim ve puan'}</h3>${typeof VakaResearchForum!=='undefined'&&VakaResearchForum.isForum(v)?'<p class="forum-report-source">Değerlendirme, bu öğrencinin kesinleşmiş Önce / Sonra katkıları ile yansıtmasını kullanır. Akran mesajları ve bireysel AI konuşması öğrencinin kendi yanıtı olarak puanlanmaz.</p>':''}<p>Her soruyu öğrencinin kendi yanıtıyla birlikte inceleyin. AI tüm soruları tek istekte değerlendirir ve tek rapor hazırlar. Geri bildirimleri ve puanları kendiniz de girebilir veya düzenleyebilirsiniz.</p>
     ${v.application.state!=='submitted'?'<p>Rapor hazırlamak için öğrenci tesliminin tamamlanması gerekiyor.</p>':''}
     ${legacy?'<p class="review-total">Kayıtlı rapor önceki genel değerlendirme düzeninde. Soru bazındaki alanlar henüz doldurulmadı. Yeni düzen için AI ile rapor hazırlayın veya her soruyu elle değerlendirin. Önceki rapor önizlemede korunur.</p>':''}
     <fieldset ${pending||v.application.state!=='submitted'?'disabled':''}>

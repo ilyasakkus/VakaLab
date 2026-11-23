@@ -50,6 +50,7 @@ final class Migration {
             }
         }
         self::forums($db);
+        self::research($db);
     }
 
     // Additive and retryable: safe on existing installs and concurrent first requests.
@@ -62,6 +63,17 @@ final class Migration {
             foreach($db->all('SELECT id FROM cases') as $case)Forum::ensure($db,$case['id']);
             $tail=$db->sqlite()?' ON CONFLICT(version) DO NOTHING':' ON DUPLICATE KEY UPDATE version=version';
             $db->q('INSERT INTO schema_migrations (version,applied_at) VALUES (4,?)'.$tail,[now()]);
+        };
+        if($db->sqlite())$db->tx($apply);else $apply();
+    }
+
+    public static function research(Db $db): void {
+        if($db->one('SELECT version FROM schema_migrations WHERE version=5'))return;
+        demand((bool)$db->one('SELECT version FROM schema_migrations WHERE version=4'),'Önce forum tablolarını hazırlayın',503);
+        $apply=function()use($db){
+            if($db->one('SELECT version FROM schema_migrations WHERE version=5'))return;
+            foreach(explode(';',file_get_contents(__DIR__.'/../migrations/005.sql')) as $sql)if(trim($sql)!=='')$db->pdo->exec($sql);
+            $tail=$db->sqlite()?' ON CONFLICT(version) DO NOTHING':' ON DUPLICATE KEY UPDATE version=version';$db->q('INSERT INTO schema_migrations (version,applied_at) VALUES (5,?)'.$tail,[now()]);
         };
         if($db->sqlite())$db->tx($apply);else $apply();
     }

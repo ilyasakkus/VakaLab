@@ -121,6 +121,23 @@ body[data-ui-role="student"] .student-rich-editor .ql-tooltip a.ql-remove::befor
 .forum-reply-target { padding: 12px; background: #eaf2e9; border-radius: 7px; font-size: 13px; }
 .forum-reply-target button { margin-left: 8px; padding: 5px 9px; min-height: 32px; font-size: 12px; }
 .research-forums { max-width: 100%; }.research-forums > summary { font-size: 18px; }
+.research-forum-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 20px 0; }
+.research-forum-stage { min-width: 0; padding: 18px; border: 1px solid #dce5de; border-radius: 10px; background: #fbfcfa; }
+.research-forum-questions { padding-left: 20px; line-height: 1.7; font-size: 14px; }
+.research-forum-stats { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
+.research-forum-stats div { background: #eaf2e9; padding: 10px 13px; border-radius: 7px; }
+.research-forum-stats dt { font-size: 12px; }.research-forum-stats dd { font-size: 22px; font-weight: 700; margin: 5px 0 0; }
+.research-forum-post { padding: 16px 0; border-top: 1px solid #dce5de; overflow-wrap: anywhere; min-width: 0; }
+.research-forum-post .toolbar { align-items: flex-start; flex-wrap: wrap; font-size: 13px; }.research-forum-post .toolbar span { color: var(--muted); }
+.forum-parent-context { padding: 8px 12px; background: #eef3ec; font-size: 13px; }
+.research-forum-snapshots > section { border-top: 1px solid #dce5de; margin-top: 16px; padding-top: 12px; }
+.forum-report-source { padding: 14px 18px; background: #edf5ec; border-left: 3px solid #719b76; }
+.study-context { padding: 14px 18px; background: #edf4e9; border: 1px solid #d7e3d0; border-radius: 8px; line-height: 1.7; }
+.study-workspace .process-summary-grid { margin-top: 18px; }.study-workspace h3 { margin-top: 28px; }
+.study-post-list { max-height: 650px; overflow-y: auto; border: 1px solid #dce5de; border-radius: 8px; }
+.study-post-choice { padding: 18px; border-bottom: 1px solid #dce5de; overflow-wrap: anywhere; }
+.study-post-choice:last-child { border-bottom: 0; }.study-post-choice .prose { max-height: 240px; overflow-y: auto; margin: 12px 0; }
+@media (max-width: 1100px) { .research-forum-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .case-forum { padding-top: 18px; }.forum-heading h3 { font-size: 19px; }.forum-post { padding: 14px; }.forum-post.is-reply, .forum-post[data-depth] { margin-left: 12px; }.forum-post[data-depth="0"] { margin-left: 0; } }
 @media (max-width: 600px) {
     body[data-ui-role="student"] .student-rich-editor .ql-toolbar.ql-snow { padding: 7px; }

@@ -27,6 +27,25 @@ final class Forum {
         foreach(Review::QUESTIONS as $step=>$questions)foreach($questions as $key=>$question)$out[]=['source_id'=>$key,'section'=>[3=>'Başlangıç değerlendirmesi',4=>'Nihai değerlendirme',6=>'Yansıtma'][$step],'question'=>$question,'answer'=>$draft[$key]??''];return $out;
     }
 
+    public function research(array $u,string $appId): array {
+        Auth::researcher($u);$a=$this->app->access($u,$appId);$db=$this->app->db;$stages=[];
+        foreach(['before'=>'initial','after'=>'submit'] as $phase=>$kind){
+            $snapshot=$db->one('SELECT body,created_at FROM snapshots WHERE app_id=? AND kind=?',[$appId,$kind]);$body=$snapshot?obj($snapshot['body']):[];
+            $stages[$phase]=['phase'=>$phase,'title'=>'Genel Tartışma Forumu ('.($phase==='before'?'Önce':'Sonra').')','questions'=>self::QUESTIONS[$phase],'own_posts'=>[],'received_replies'=>[],'snapshot_at'=>$snapshot['created_at']??null,'snapshot_post_ids'=>array_column($body['forum_posts']??[],'id'),'snapshot_source'=>array_key_exists('forum_posts',$body)?'forum':($snapshot?'individual':'none')];
+        }
+        $rows=$db->all('SELECT p.*,f.phase,a.attempt_no,u.name author,u.login author_login,parent.app_id parent_app_id,parent.user_id parent_user_id,parent.body parent_body,recipient.name parent_author FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id JOIN applications a ON a.id=p.app_id JOIN users u ON u.id=p.user_id LEFT JOIN forum_posts parent ON parent.id=p.parent_id AND parent.forum_id=p.forum_id LEFT JOIN users recipient ON recipient.id=parent.user_id WHERE f.case_id=? AND (p.app_id=? OR parent.app_id=?) ORDER BY p.created_at,p.id',[$a['case_id'],$appId,$appId]);
+        foreach($rows as $row){
+            unset($row['client_key']);$row['rich_text']=obj($row['rich_text'])?:null;$phase=$row['phase'];$row['captured']=in_array($row['id'],$stages[$phase]['snapshot_post_ids'],true);
+            if($row['app_id']===$appId&&$row['user_id']===$a['user_id'])$stages[$phase]['own_posts'][]=$row;
+            if($row['parent_app_id']===$appId&&$row['parent_user_id']===$a['user_id']&&$row['user_id']!==$a['user_id'])$stages[$phase]['received_replies'][]=$row;
+        }
+        foreach($stages as &$stage){
+            $posts=$stage['own_posts'];$replies=array_values(array_filter($posts,fn($p)=>$p['parent_id']!==null));$sent=array_filter($replies,fn($p)=>$p['parent_user_id']!==$a['user_id']);
+            $peers=array_unique(array_merge(array_column($sent,'parent_user_id'),array_column($stage['received_replies'],'user_id')));
+            $stage['statistics']=['posts'=>count($posts),'root_posts'=>count($posts)-count($replies),'replies'=>count($replies),'peer_replies_sent'=>count($sent),'peer_replies_received'=>count($stage['received_replies']),'peers'=>count($peers)];
+        }unset($stage);return $stages;
+    }
+
     public static function ensure(Db $db,string $caseId): void {
         $tail=$db->sqlite()?' ON CONFLICT(case_id,phase) DO NOTHING':' ON DUPLICATE KEY UPDATE id=id';
         foreach(['before','after'] as $phase)$db->q('INSERT INTO case_forums (id,case_id,phase,created_at) VALUES (?,?,?,?)'.$tail,[uid(),$caseId,$phase,now()]);
@@ -88,7 +107,7 @@ final class Forum {
             $permission=$this->permission($u,$a,$phase);demand($permission['can_post'],$permission['reason'],409);
             if($parent)demand((bool)$db->one('SELECT id FROM forum_posts WHERE id=? AND forum_id=?',[$parent,$board['id']]),'Yalnız aynı forumdaki bir mesaja yanıt verebilirsiniz',422);
             $count=(int)$db->one('SELECT COUNT(*) n FROM forum_posts WHERE app_id=? AND created_at>?',[$appId,gmdate('Y-m-d\TH:i:s\Z',time()-60)])['n'];demand($count<20,'Çok hızlı mesaj gönderiyorsunuz. Biraz bekleyin.',429);
-            $post=['id'=>uid(),'forum_id'=>$board['id'],'app_id'=>$appId,'user_id'=>$u['id'],'version_id'=>$a['version_id'],'parent_id'=>$parent,'client_key'=>$key,'body'=>$body,'rich_text'=>$richJson,'created_at'=>now()];$db->insert('forum_posts',$post);
+            $post=['id'=>uid(),'forum_id'=>$board['id'],'app_id'=>$appId,'user_id'=>$u['id'],'version_id'=>$a['version_id'],'parent_id'=>$parent,'client_key'=>$key,'body'=>$body,'rich_text'=>$richJson,'created_at'=>now()];$db->insert('forum_posts',$post);Research::capture($db,$post);
             $exposure=$phase==='after'?$this->exposure($appId):null;
             $db->audit($u['id'],'forum_post',$appId,'',['post_id'=>$post['id'],'case_id'=>$a['case_id'],'phase'=>$phase,'parent_id'=>$parent,'first_ai_message_id'=>$exposure['id']??null,'first_ai_at'=>$exposure['created_at']??null]);
             $post['author']=$u['name'];return ['post'=>$this->project($post,$u),'duplicate'=>false];

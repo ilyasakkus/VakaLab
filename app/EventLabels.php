@@ -22,16 +22,25 @@ final class EventLabels {
         'section_leave'=>['Çalışma ekranından ayrıldı','Gezinme','Vakalarım ekranına dönüş veya çıkışla mevcut bölüm ziyareti kapandı.'],
         'workflow_confirmed'=>['Yanıtlar kesinleştirildi','Teslim durumu','Başlangıcın kesinleşmesi veya son teslimin sunucuda başarıyla kaydedilmesi doğrulandı.'],
         'message_send'=>['AI mesajı gönderimi başlatıldı','Mesaj durumu','AI isteğinin gönderilme girişimi kaydedildi; başarı ve soru amacı sunucu isteğiyle eşleştirilerek belirlenir.'],
-        'forum_posted'=>['Forum mesajı paylaşıldı','Tartışma','Ortak vaka forumunda mesajın sunucuya kaydedildiği doğrulandı. payload.phase: before (Önce), after (Sonra); parent_id yanıt verilen mesajdır.'],
+        'forum_posted'=>['Forum gönderimi bildirildi','Tartışma','Tarayıcı bir forum mesajı gönderiminin tamamlandığını bildirdi; doğrulanmış gönderim forum_posts ve sunucu işlem kaydıyla eşleştirilir. phase aşamayı, parent_id yanıt verilen mesajı belirtir.'],
         'app_presence'=>['Uygulama durumu değişti','Gezinme','Uygulamadan ayrılma veya uygulamaya dönüş kaydı.'],
+        'forum_open'=>['Forum görüntülendi','Tartışma','Forum verileri ekrana yüklendi; mesajların okunduğunu göstermez.'],
+        'forum_focus'=>['Forum editörüne odaklanıldı','Tartışma','Ortak forum mesaj editörü odak aldı; mesaj gönderildiği anlamına gelmez.'],
+        'forum_draft_changed'=>['Forum taslağı değişti','Tartışma','Gönderilmemiş forum taslağında metin veya biçim değişikliği gözlendi; taslak metni olay kaydına eklenmez.'],
+        'forum_reply_selected'=>['Forumda yanıt hedefi seçildi','Tartışma','Yanıt yazılacak mesaj seçildi; yanıtın gönderildiğini göstermez.'],
+        'forum_reply_cancelled'=>['Forumda yanıt hedefi kaldırıldı','Tartışma','Yanıt hedefi kaldırıldı; daha önce gönderilmiş bir mesajın silinmesi değildir.'],
+        'forum_message_visible'=>['Forum mesaj kartı görünür oldu','Tartışma','Odaklı sayfada mesaj kartının en az 40 pikseli en az 1 saniye görünür gözlendi. Okunduğunu veya Passive/Interactive katılımı kanıtlamaz.'],
     ];
     public const SECTIONS = ['case'=>'Vaka metni','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];
-    public static function describe(array $event): array {
+    public static function sections(bool $forum=false): array {return $forum?array_replace(self::SECTIONS,['initial'=>'Genel Tartışma Forumu (Önce)','final'=>'Genel Tartışma Forumu (Sonra)']):self::SECTIONS;}
+    public static function describe(array $event,bool $forum=false): array {
         [$name,$category,$description] = self::TYPES[$event['type']] ?? ['Tanımlanmamış olay','Tanımlanmamış','Özgün olay kodunu inceleyin.'];
         $p=(is_array($event['payload']??null)?$event['payload']:(json_decode($event['payload']??'{}',true)?:[]));
         if($event['type']==='app_presence'){$name=($p['app_active']??false)?'Vaka sekmesi yeniden etkin':'Vaka sekmesi etkinliğini kaybetti';$description=($p['app_active']??false)?'Bölüm süresi yeniden başladı.':'Sayfa gizli veya pencere odaksız; vaka sekmesi yeniden etkin olana kadar bölüm süresi durur.';}
         if($event['type']==='section_open'&&!empty($p['locked'])){$name=$event['section']==='ai'?'Kilitli AI bölümünü görüntüleme':'Kilitli bölüm görüntüleme';$description='İstenen bölüm kilitliydi; erişim denemesi kaydedildi.';}
-        return $event + ['type_tr'=>$name,'section_tr'=>self::SECTIONS[$event['section']] ?? 'Tanımlanmamış bölüm','event_category'=>$category,'event_description'=>$description];
+        if($forum&&$event['type']==='workflow_confirmed'&&($p['kind']??'')==='initial'){$name='AI öncesi tartışma tamamlandı';$description='Öğrencinin Önce katkıları ve vaka profili kesinleşti; bireysel AI sohbeti açıldı.';}
+        if(str_starts_with($event['type'],'forum_')&&in_array($p['phase']??null,['before','after'],true))$name.=' ('.($p['phase']==='before'?'Önce':'Sonra').')';
+        return $event + ['type_tr'=>$name,'section_tr'=>self::sections($forum)[$event['section']] ?? 'Tanımlanmamış bölüm','event_category'=>$category,'event_description'=>$description];
     }
     public static function dictionary(): array {
         $rows = [
@@ -42,7 +51,7 @@ final class EventLabels {
             ['field'=>'events.client_at / received_at / client_seq','meaning'=>'client_at istemci UTC zamanı, received_at sunucuya ulaşma UTC zamanı. Gecikmeli gönderim olabilir; client_seq aynı sekme/oturumda sıra kontrolüdür. İstemci saatinin doğruluğu garanti edilmez.'],
         ];
         foreach (self::TYPES as $code=>[$name,$category,$description]) $rows[] = ['field'=>'events.type.'.$code,'meaning'=>$name.' · '.$category.' · '.$description];
-        foreach (self::SECTIONS as $code=>$name) $rows[] = ['field'=>'events.section.'.$code,'meaning'=>$name];
+        foreach (self::SECTIONS as $code=>$name) $rows[] = ['field'=>'events.section.'.$code,'meaning'=>$name.(in_array($code,['initial','final'],true)?' (response_mode=forum için: '.self::sections(true)[$code].')':'')];
         return $rows;
     }
 }

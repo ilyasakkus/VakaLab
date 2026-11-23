@@ -5,9 +5,9 @@ ApiRuntime::start();
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: same-origin');
 try{
     $config=cfg();demand($config['env']!=='production'||$config['https'],'Üretimde HTTPS zorunlu',503);
-    $db=new Db($config);Migration::forums($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
+    $db=new Db($config);Migration::forums($db);Migration::research($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
     if($_SERVER['REQUEST_METHOD']==='POST'){$auth->csrf();demand((int)($_SERVER['CONTENT_LENGTH']??0)<=1048576,'İstek çok büyük',413);$p=obj(file_get_contents('php://input'));}
-    $writes=['login','register','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic'];
+    $writes=['login','register','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic','research'];
     if(in_array($op,$writes,true))demand($_SERVER['REQUEST_METHOD']==='POST','POST gerekli',405);
     if($op==='token'){$result=['csrf'=>$_SESSION['csrf']];}
     elseif($op==='login'){$u=$auth->login($p['login']??'',$p['password']??'');$result=['role'=>$u['role'],'csrf'=>$_SESSION['csrf']];}
@@ -29,6 +29,8 @@ try{
         case 'forum_post':$result=(new Forum($app))->post($u,$id,$p);break;
         case 'chat':$result=$app->chat($u,$id,$p);break;
         case 'events':$result=(new Telemetry($app))->ingest($u,$id,$p,$session);break;
+        case 'research_data':$result=(new Research($app))->overview($u,$_GET);break;
+        case 'research':$result=(new Research($app))->mutate($u,$p);break;
         case 'dashboard':$result=(new Admin($app))->dashboard($u);break;
         case 'admin':$result=(new Admin($app))->mutate($u,$p['action'],$p);break;
         case 'new_run':$result=(new Analysis($app))->newRun($u,$id,$p['rubric_id'],(int)($p['review_version']??1));break;
@@ -40,6 +42,13 @@ try{
         case 'report_data':$result=(new Export($app))->reportData($u,$_GET['id']??'',!empty($_GET['student_view']));break;
         case 'download':
             $ex=new Export($app);$format=$_GET['format']??'json';$rids=explode(',',$_GET['report_ids']??'');$report=($rids[0]??'')!=='';$data=[];
+            if(in_array($format,['research_json','research_zip','graphml'],true)){
+                demand(!$report,'Araştırma paketi vaka verileri içindir');$bundle=(new ResearchExport($app))->build($u,$_GET);$db->audit($u['id'],'research_download','dataset','',['format'=>$format,'filters'=>$bundle['manifest']['filters']]);
+                if($format==='research_json'){$bytes=js($bundle);$mime='application/json';$name='vakalab-arastirma.json';}
+                elseif($format==='graphml'){$nets=$bundle['networks'];if(!empty($_GET['layer_id']))$nets=array_values(array_filter($nets,fn($n)=>$n['id']===$_GET['layer_id']));demand(count($nets)===1,'GraphML için tek bir ağ katmanı seçin');$bytes=ResearchExport::graphml($nets[0]);$mime='application/graphml+xml';$name='vakalab-ag.graphml';}
+                else{$path=tempnam(__DIR__.'/../storage','research-');try{ResearchExport::zip(ResearchExport::files($bundle),$path);$bytes=file_get_contents($path);}finally{if(is_file($path))unlink($path);}$mime='application/zip';$name='vakalab-arastirma-paketi.zip';}
+                header('Content-Type: '.$mime);header('Content-Disposition: attachment; filename="'.$name.'"');echo $bytes;exit;
+            }
             if($format==='disco'){
                 demand(!$report,'Disco vaka olayları içindir');$bytes=$ex->disco($u,$_GET);
                 header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="'.(($_GET['view']??'visits')==='events'?'vakalab-disco-olaylar.csv':'vakalab-disco-gecis-sureler.csv').'"');echo $bytes;exit;

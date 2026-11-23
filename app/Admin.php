@@ -7,7 +7,9 @@ final class Admin {
         $cases=$db->all('SELECT c.*,v.body,v.instructions,v.notes,v.version FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.owner_id=? ORDER BY position',[$u['id']]);
         $cids=array_column($cases,'id');$inCase=fn($row)=>in_array($row['case_id'],$cids,true);
         $assignments=array_values(array_filter($db->all('SELECT * FROM assignments'),$inCase));
-        $apps=array_values(array_filter($db->all('SELECT id,user_id,case_id,version_id,attempt_no,state,initial_at,submitted_at,last_section,last_activity,active_request,excluded FROM applications ORDER BY attempt_no DESC'),$inCase));
+        $apps=array_values(array_filter($db->all('SELECT id,user_id,case_id,version_id,attempt_no,state,initial_at,submitted_at,last_section,last_activity,active_request,excluded,draft FROM applications ORDER BY attempt_no DESC'),$inCase));
+        $forumCounts=[];foreach($db->all('SELECT p.app_id,f.phase,COUNT(*) n FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id JOIN cases c ON c.id=f.case_id WHERE c.owner_id=? GROUP BY p.app_id,f.phase',[$u['id']]) as $row)$forumCounts[$row['app_id']][$row['phase']]=(int)$row['n'];
+        foreach($apps as &$application){$application['response_mode']=(obj($application['draft'])['response_mode']??'')==='forum'?'forum':'individual';unset($application['draft']);$application['forum_participation']=array_replace(['before'=>0,'after'=>0],$forumCounts[$application['id']]??[]);}unset($application);
         $aids=array_column($apps,'id');$inApp=fn($row)=>in_array($row['app_id'],$aids,true);
         $users=$db->all('SELECT id,login,name,role,status,metadata,test,owner_id FROM users ORDER BY login');
         $users=array_values(array_filter($users,fn($row)=>$row['owner_id']===$u['id']||$row['id']===$u['id']));
@@ -19,7 +21,7 @@ final class Admin {
         $targets=array_merge($cids,$aids,array_column($assignments,'id'),array_column($defs,'id'));
         return ['users'=>$users,'cases'=>$cases,'versions'=>array_values(array_filter($db->all('SELECT id,case_id,version FROM case_versions ORDER BY case_id,version'),$inCase)),
             'assignments'=>$assignments,'applications'=>$apps,
-            'analysis_status'=>array_values(array_filter($db->all("SELECT r.app_id,MAX(CASE WHEN s.status='completed' THEN s.step ELSE 0 END) completed_step FROM analysis_runs r LEFT JOIN analysis_steps s ON s.run_id=r.id GROUP BY r.app_id"),$inApp)),
+            'analysis_status'=>array_values(array_filter($db->all("SELECT r.app_id,MAX(CASE WHEN s.status='completed' THEN s.step ELSE 0 END) completed_step,MAX(CASE WHEN s.directive IN ('holistic-v1','holistic-v2') THEN 3 ELSE 1 END) review_version FROM analysis_runs r LEFT JOIN analysis_steps s ON s.run_id=r.id GROUP BY r.app_id"),$inApp)),
             'report_status'=>array_values(array_filter($db->all('SELECT app_id,MAX(approved_at) approved_at,MAX(published_at) published_at FROM reports GROUP BY app_id'),$inApp)),
             'technical'=>array_values(array_filter($db->all("SELECT DISTINCT app_id FROM ai_requests WHERE status IN ('failed','partial')"),$inApp)),
             'definitions'=>$defs,'audit'=>array_slice(array_values(array_filter($db->all('SELECT * FROM audit ORDER BY created_at DESC'),fn($row)=>$row['actor']===$u['id']||in_array($row['target'],$targets,true))),0,100)];

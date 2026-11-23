@@ -32,3 +32,20 @@ Bilinen sınır: seçim aralığı metin alanlarında alan içidir; vaka/mesaj D
 ## 0.1.8 — Türkçe dışa aktarma açıklamaları
 `events` çıktısına eklenen alanlar: `type_tr` (Türkçe olay adı), `section_tr` (Türkçe bölüm), `event_category` (Gezinme / Alan etkileşimi / Teknik durum / Yanıt durumu), `event_description` (gözlemin anlamı ve sınırı). Özgün `type`, `section`, UTC zamanları, satırlar ve DB kayıtları değişmez. Excel/CSV/JSON aynı açıklamaları taşır. `dictionary`,16 olay ve7 bölüm kodunu ve temel alanların kullanımını açıklar; veri filtreleri boş sonuç verse de sözlük doludur.
 Process mining için süreç örneği `app_id` (öğrenci×vaka çalışması), etkinlik kodu `type`, bölüm bağlamı `section` olarak kullanılabilir. `case_id` tek başına süreç örneği değildir. `client_at` istemci zamanı, `received_at` sunucuya ulaşma zamanıdır; çevrimdışı gecikme ve istemci saatinin doğrulanmamış olması hesaba katılmalıdır. Aynı sekme/oturum içi sıra `client_seq` ile kontrol edilir. `heartbeat` periyodik teknik gözlemdir; kullanıcı eylemi değildir. Analizin amacına göre Teknik durum grubu filtrelenebilir; dışa aktarma otomatik satır silmez. Başka bölümlerde aynı olay türünü ayırmak için `type_tr` ve `section_tr` birlikte okunabilir. Hiçbiri okuma/düşünme kanıtı değildir.
+## Araştırma planı eki — 20 Kasım 2026
+
+Mevcut olay kodları korunur. `initial` ve `final` bölüm kodları yeni forum düzeninde sırasıyla Genel Tartışma Forumu (Önce)/(Sonra) olarak adlandırılır; araştırma paketindeki `case_stage` karşılıkları `before`/`after` olur.
+
+| Olay | Kaynak / kapsam | Yorum sınırı |
+| --- | --- | --- |
+| `forum_open` | Tarayıcı; phase ve visibility_observer_available | Forum verisi ekrana yüklendi; okunma kanıtı değildir |
+| `forum_focus` | Tarayıcı; phase, field | Editör odağı; yazılmış/gönderilmiş mesaj değildir |
+| `forum_draft_changed` | Tarayıcı; phase, field, characters | Metin/biçim düzenlemesi; taslak metni kaydedilmez |
+| `forum_reply_selected` / `forum_reply_cancelled` | Tarayıcı; phase, parent_id | Yanıt hedefi seçme/iptal; paylaşılmış yanıt değildir |
+| `forum_message_visible` | Tarayıcı; post_id, author_id, phase, visible_ms, visibility_basis | Odaklı kartın kısmi görünürlüğü; okuma, dikkat veya ICAP kodu değildir |
+| `forum_posted` | Tarayıcı gönderim bildirimi | Aynı post_id'nin gerçek sunucu mesajı varsa ana süreçte ikinci gönderim olarak sayılmaz |
+| `forum_post` / `forum_reply` | Araştırma paketinde gerçek forum_posts sunucu kaydı | Anlık olay; zaman damgası gönderimin kaydedildiği andır |
+| `research_settings` | Araştırmacı işlemi; gerekçeli ayar sürümü | Öğrenci davranışı değildir; öğrenci dizisine eklenmez |
+| `research_dialogue` / `research_annotation` | Araştırmacı işlemi; kanıt/kodlama geçmişi | İnsan kodlaması; öğrenenin bilişsel davranışıyla karıştırılmaz |
+
+Hafta/grup/deneme ve kimlik kodları çıktı tablolarında açık sütunlardır. Eski kayıtlara eksik görünürlük, materyal açma, mesaj revizyonu veya ICAP kodu üretilmez. Aynı öğrencinin zaman dizisiyle bağlı diyalog dizisi ayrı analiz birimleridir. Ayrıntı: [Araştırma analiz rehberi](RESEARCH_ANALYSIS_GUIDE_TR.md).

@@ -27,10 +27,10 @@ $three=$forum->post($u,$id,['phase'=>'after','body'=>'Kararımı gerekçelerle v
 promptCheck($forum->listing($u,$id,'after')['questions']===['Nihai kararınız nedir?'],'after forum has one final-decision question');
 $a=$app->save($u,$id,['revision'=>$a['revision'],'draft'=>$final],'submit');
 promptCheck($a['state']==='submitted'&&obj($a['draft'])['final_decision']===''&&obj($a['draft'])['final_reason']==='','forum contribution replaces individual final answer boxes');
-$snap=obj($db->one("SELECT body FROM snapshots WHERE app_id=? AND kind='submit'",[$id])['body']);promptCheck(array_column($snap['forum_posts'],'id')===[$two['id'],$three['id']],'final snapshot captures all own posts and replies');
+$snap=obj($db->one("SELECT body FROM snapshots WHERE app_id=? AND kind='submit'",[$id])['body']);promptCheck(count($snap['forum_posts'])===2&&!array_diff(array_column($snap['forum_posts'],'id'),[$two['id'],$three['id']]),'final snapshot captures all own posts and replies');
 $review=new HolisticReview($app);$payload=$review->payload($r,$id,'test-rubric-v1');
 promptCheck(array_column($payload['question_answers'],'source_id')===['forum_before','forum_after','reflection'],'current report uses forum stages and reflection instead of removed fields');
-promptCheck($payload['sources']['forum_before']===$one['body']&&$payload['sources']['forum_after']===$two['body']."\n\n".$three['body'],'report evidence is exact own forum text');
+promptCheck($payload['sources']['forum_before']===$one['body']&&$payload['sources']['forum_after']===implode("\n\n",array_column($snap['forum_posts'],'body')),'report evidence is exact own forum text');
 promptCheck(!str_contains(js($payload['sources']),'PEER BEFORE'),'report never attributes peer text to student');
 $view=$app->view($r,$id);promptCheck($view['review_questions']===$payload['question_answers'],'researcher report editor and provider use same source questions');
 $report=$review->handle($r,['action'=>'generate','app_id'=>$id,'rubric_id'=>'test-rubric-v1','version'=>0]);

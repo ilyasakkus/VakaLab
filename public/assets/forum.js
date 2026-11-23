@@ -24,11 +24,18 @@
         const key=`vakalab:forum:${userId}:${appId}:${phase}`,store=options.storage||root.sessionStorage;
         let draft={body:'',rich_text:null,parent_id:null,key:root.crypto.randomUUID()};
         try{const saved=JSON.parse(store.getItem(key)||'null');if(saved&&typeof saved.body==='string')draft={...draft,...saved};}catch{}
-        let posts=[],cursor='',hasMore=false,canPost=false,canRead=false,posting=false,loading=false,destroyed=false,timer,quill,rendered='';
+        let opened=false,posts=[],cursor='',hasMore=false,canPost=false,canRead=false,posting=false,loading=false,destroyed=false,timer,quill,rendered='';
+        const exposed=new Set(),exposureTimers=new Map();let observer=null;
         const title='Genel Tartışma Forumu ('+label(phase)+')';
         host.classList.add('case-forum');host.dataset.forumPhase=phase;
-        host.innerHTML=`<div class="forum-heading"><div><span class="eyebrow">Vaka arkadaşlarıyla tartışma</span><h3>${title}</h3></div><button type="button" class="secondary" data-forum-refresh>Yenile</button></div><p class="muted">${phase==='before'?'Bireysel AI sohbetinden önce bu vakaya ilişkin görüşlerinizi paylaşın. Bu aşamayı tamamlayıp AI sohbetine geçtikten sonra bu alana yeni mesaj yazamazsınız.':'Bireysel AI sohbetinin ardından bu vakaya ilişkin görüşlerinizi arkadaşlarınızla paylaşın.'} Birden fazla mesaj yazabilir ve bir mesaja yanıt verebilirsiniz.</p>${questionHtml(phase)}<p class="forum-permission" role="status"></p><p class="forum-count muted"></p><div class="forum-error" role="alert" hidden></div><div class="forum-feed" aria-label="${title} mesajları"></div><button type="button" class="secondary" data-forum-more hidden>Daha fazla mesaj yükle</button><div class="forum-composer" hidden><div class="forum-reply-target" hidden></div><label for="forum_body_${phase}">${phase==='after'?'Nihai görüşünüz / yanıtınız':'Görüşünüz / yanıtınız'}</label><textarea id="forum_body_${phase}"></textarea><div class="row spaced"><button type="button" data-forum-send>Mesajı paylaş</button><button type="button" class="secondary" data-forum-clear>Taslağı temizle</button><span class="muted forum-draft-status"></span></div></div>`;
+        host.innerHTML=`<div class="forum-heading"><div><span class="eyebrow">Vaka arkadaşlarıyla tartışma</span><h3>${title}</h3></div><button type="button" class="secondary" data-forum-refresh>Yenile</button></div><p class="muted">${phase==='before'?'Bireysel AI sohbetinden önce bu vakaya ilişkin görüşlerinizi paylaşın. Bu aşamayı tamamlayıp AI sohbetine geçtikten sonra bu alana yeni mesaj yazamazsınız.':'Bireysel AI sohbetinin ardından bu vakaya ilişkin görüşlerinizi arkadaşlarınızla paylaşın.'} Birden fazla mesaj yazabilir ve bir mesaja yanıt verebilirsiniz. Gerçek çocukların veya okulların kimliğini belirleyen bilgi paylaşmayın.</p>${questionHtml(phase)}<p class="forum-permission" role="status"></p><p class="forum-count muted"></p><div class="forum-error" role="alert" hidden></div><div class="forum-feed" aria-label="${title} mesajları"></div><button type="button" class="secondary" data-forum-more hidden>Daha fazla mesaj yükle</button><div class="forum-composer" hidden><div class="forum-reply-target" hidden></div><label for="forum_body_${phase}">${phase==='after'?'Nihai görüşünüz / yanıtınız':'Görüşünüz / yanıtınız'}</label><textarea id="forum_body_${phase}"></textarea><div class="row spaced"><button type="button" data-forum-send>Mesajı paylaş</button><button type="button" class="secondary" data-forum-clear>Taslağı temizle</button><span class="muted forum-draft-status"></span></div></div>`;
         const find=selector=>host.querySelector(selector),feed=find('.forum-feed'),error=find('.forum-error'),source=find('textarea'),composer=find('.forum-composer'),replyTarget=find('.forum-reply-target'),send=find('[data-forum-send]');
+        const clearExposure=()=>{for(const timer of exposureTimers.values())root.clearTimeout(timer);exposureTimers.clear();};
+        const visible=node=>{if(root.document.hidden||!root.document.hasFocus())return false;const a=node.getBoundingClientRect(),b=feed.getBoundingClientRect();return Math.min(a.bottom,b.bottom,root.innerHeight)-Math.max(a.top,b.top,0)>=40;};
+        const observePosts=()=>{if(!observer)return;clearExposure();observer.disconnect();for(const node of feed.querySelectorAll('[data-forum-post]'))if(!exposed.has(node.dataset.forumPost))observer.observe(node);};
+        if(typeof root.IntersectionObserver==='function'&&options.onInteraction)observer=new root.IntersectionObserver(entries=>{for(const entry of entries){const node=entry.target,id=node.dataset.forumPost;if(!entry.isIntersecting||!visible(node)){root.clearTimeout(exposureTimers.get(id));exposureTimers.delete(id);continue;}if(exposed.has(id)||exposureTimers.has(id))continue;exposureTimers.set(id,root.setTimeout(()=>{exposureTimers.delete(id);if(destroyed||!node.isConnected||!visible(node))return;exposed.add(id);observer.unobserve(node);const post=posts.find(p=>p.id===id);options.onInteraction?.('forum_message_visible',{phase,post_id:id,author_id:post?.author_id,visible_ms:1000,visibility_basis:'partial_card_min_40px',is_own:!!post?.is_own});},1000));}},{root:feed,threshold:0});
+        const exposurePresence=()=>{clearExposure();if(!root.document.hidden&&root.document.hasFocus())observePosts();};
+        root.document.addEventListener('visibilitychange',exposurePresence);root.addEventListener('focus',exposurePresence);root.addEventListener('blur',clearExposure);
         source.value=draft.body;
         const persist=(renew=false)=>{if(renew)draft.key=root.crypto.randomUUID();if(draft.body.trim()||draft.parent_id)store.setItem(key,JSON.stringify(draft));else store.removeItem(key);};
         const showError=message=>{if(destroyed)return;error.textContent=message;error.hidden=!message;};
@@ -40,14 +47,14 @@
             find('.forum-draft-status').textContent=draft.body.trim()?'Gönderilmemiş taslak bu sekmede korunuyor.':'';
             const parent=posts.find(post=>post.id===draft.parent_id);replyTarget.hidden=!draft.parent_id;
             replyTarget.innerHTML=draft.parent_id?`<span><b>${escape(parent?.author||'Seçilen mesaj')}</b> adlı kişiye yanıt yazıyorsunuz.</span> <button type="button" class="secondary" data-cancel-reply>Yanıtı iptal et</button>`:'';
-            const cancel=find('[data-cancel-reply]');if(cancel)cancel.onclick=()=>{draft.parent_id=null;persist(true);updateControls();};
+            const cancel=find('[data-cancel-reply]');if(cancel)cancel.onclick=()=>{draft.parent_id=null;persist(true);options.onInteraction?.('forum_reply_cancelled',{phase});updateControls();};
             feed.querySelectorAll('[data-reply-id]').forEach(button=>button.disabled=!enabled);
         };
         const ensureEditor=()=>{
             if(!quill&&editor?.mount&&canRead&&(canPost||draft.body.trim()))quill=editor.mount(source,{delta:draft.rich_text,onChange:delta=>{draft.rich_text=delta;},onError:e=>showError(e.message)});
         };
         const draw=()=>{
-            if(destroyed)return;const top=feed.scrollTop,html=postHtml(posts,canPost&&!posting,editor,highlightUser);if(rendered!==html){rendered=html;feed.innerHTML=html;editor?.decorate?.(feed);feed.scrollTop=top;}
+            if(destroyed)return;const top=feed.scrollTop,html=postHtml(posts,canPost&&!posting,editor,highlightUser);if(rendered!==html){rendered=html;feed.innerHTML=html;editor?.decorate?.(feed);feed.scrollTop=top;observePosts();}
             feed.hidden=!canRead;find('.forum-count').textContent=canRead?`${posts.length}${hasMore?'+':''} mesaj`:'';find('[data-forum-more]').hidden=!hasMore||!canRead;
             ensureEditor();updateControls();
         };
@@ -58,13 +65,14 @@
                 const data=await api('forum',undefined,{app_id:appId,phase,...(cursor?{after:cursor}:{})});if(destroyed)return;
                 canRead=data.can_read;canPost=data.can_post;hasMore=data.has_more;find('.forum-permission').textContent=data.reason||'';
                 if(!canRead){posts=[];cursor='';}else{merge(data.posts);cursor=data.next_after||cursor;}
-                showError('');draw();options.onState?.(data);
+                showError('');draw();options.onState?.(data);if(!opened&&canRead){opened=true;options.onInteraction?.('forum_open',{phase,visibility_observer_available:!!observer});}
             }catch(e){showError(e.message);}finally{loading=false;}
         };
-        source.addEventListener('input',()=>{if(destroyed)return;draft.body=source.value;if(!editor?.has?.(source))draft.rich_text=null;persist(true);updateControls();});
-        feed.addEventListener('click',event=>{const button=event.target.closest?.('[data-reply-id]');if(!button||!canPost||posting||options.readOnly?.())return;draft.parent_id=button.dataset.replyId;persist(true);updateControls();editor?.focus?.(source);composer.scrollIntoView?.({block:'nearest'});});
+        source.addEventListener('input',()=>{if(destroyed)return;draft.body=source.value;if(!editor?.has?.(source))draft.rich_text=null;persist(true);options.onInteraction?.('forum_draft_changed',{phase,field:'forum_body_'+phase,characters:Array.from(draft.body).length,parent_id:draft.parent_id},true);updateControls();});
+        source.onfocus=()=>options.onInteraction?.('forum_focus',{phase,field:'forum_body_'+phase});
+        feed.addEventListener('click',event=>{const button=event.target.closest?.('[data-reply-id]');if(!button||!canPost||posting||options.readOnly?.())return;draft.parent_id=button.dataset.replyId;persist(true);options.onInteraction?.('forum_reply_selected',{phase,parent_id:draft.parent_id});updateControls();editor?.focus?.(source);composer.scrollIntoView?.({block:'nearest'});});
         find('[data-forum-refresh]').onclick=()=>refresh();find('[data-forum-more]').onclick=()=>refresh();
-        find('[data-forum-clear]').onclick=async()=>{if(posting)return;if(draft.body.trim()&&options.confirm&&!(await options.confirm('Gönderilmemiş forum taslağı temizlensin mi?')))return;draft={body:'',rich_text:null,parent_id:null,key:root.crypto.randomUUID()};store.removeItem(key);source.value='';if(quill)editor.setText(source,'');updateControls();};
+        find('[data-forum-clear]').onclick=async()=>{if(posting)return;if(draft.body.trim()&&options.confirm&&!(await options.confirm('Gönderilmemiş forum taslağı temizlensin mi?')))return;draft={body:'',rich_text:null,parent_id:null,key:root.crypto.randomUUID()};store.removeItem(key);source.value='';if(quill)editor.setText(source,'');options.onInteraction?.('forum_draft_changed',{phase,field:'forum_body_'+phase,characters:0,cleared:true});updateControls();};
         send.onclick=async()=>{
             if(posting||!canPost||options.readOnly?.()||!draft.body.trim())return;
             if(Array.from(draft.body).length>8000){showError('Mesajınız en fazla 8.000 karakter olabilir.');return;}
@@ -81,7 +89,7 @@
             finally{posting=false;if(!destroyed)draw();}
         };
         const ready=refresh();timer=root.setInterval(()=>{if(!root.document?.hidden)refresh();},options.pollMs||12000);
-        return {ready,phase,refresh,hasDraft:()=>!!draft.body.trim()||posting,focus:()=>editor?.focus?.(source),destroy(){if(destroyed)return;persist();destroyed=true;root.clearInterval(timer);editor?.unmount?.(source);}};
+        return {ready,phase,refresh,hasDraft:()=>!!draft.body.trim()||posting,focus:()=>editor?.focus?.(source),destroy(){if(destroyed)return;persist();destroyed=true;root.clearInterval(timer);clearExposure();observer?.disconnect();root.document.removeEventListener('visibilitychange',exposurePresence);root.removeEventListener('focus',exposurePresence);root.removeEventListener('blur',clearExposure);editor?.unmount?.(source);}};
     }
     const forum={mount,hasDraft,threadRows,postHtml};if(typeof module!=='undefined'&&module.exports)module.exports=forum;if(root)root.VakaForum=forum;
 })(typeof globalThis!=='undefined'?globalThis:this);
