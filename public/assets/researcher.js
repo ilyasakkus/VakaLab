@@ -234,7 +234,8 @@ function caseForm(c){
             const optDiv=document.createElement('div');
             optDiv.className='row';
             optDiv.style.marginBottom='6px';
-            optDiv.innerHTML=`<input type="text" data-quiz-option value="${esc(val)}" placeholder="Seçenek metni" style="flex:1"><button type="button" class="secondary" data-remove-opt>×</button>`;
+            optDiv.style.flexWrap='nowrap';
+            optDiv.innerHTML=`<input type="text" data-quiz-option value="${esc(val)}" placeholder="Seçenek metni" style="flex:1;width:auto;min-width:0"><button type="button" class="secondary" data-remove-opt style="flex-shrink:0">×</button>`;
             optDiv.querySelector('[data-remove-opt]').onclick=()=>optDiv.remove();
             optsList.append(optDiv);
         };

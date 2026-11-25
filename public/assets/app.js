@@ -153,12 +153,12 @@ function renderMaterialsSection(){
         
         <div class="materials-links-section" style="margin-top:28px;">
             <h3>Ek Ders Materyalleri & Kaynaklar</h3>
-            ${items.length?`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px;">
+            ${items.length?`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-top:12px;">
                 ${items.map(item=>{const href=safeExternalUrl(item.url);return `
                     <article class="card material-item-card">
                         <h4>${esc(item.title||'Ders Materyali')}</h4>
                         ${item.desc?`<p class="muted">${esc(item.desc)}</p>`:''}
-                        ${href?`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" class="material-link-btn" data-track-material="${esc(item.id)}" data-title="${esc(item.title||'Materyal')}" data-url="${esc(href)}" style="display:inline-block;margin-top:8px;padding:8px 14px;background:var(--accent,#0056b3);color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">
+                        ${href?`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" class="material-link-btn" data-track-material="${esc(item.id)}" data-title="${esc(item.title||'Materyal')}" data-url="${esc(href)}">
                             Kaynağı Aç / İncele ↗
                         </a>`:'<span class="muted">Geçerli bağlantı eklenmemiş.</span>'}
                     </article>
@@ -190,7 +190,7 @@ function renderQuizSection(){
                             <h3 style="margin-top:0;"><strong>Soru ${idx+1}:</strong> ${esc(q.question)}</h3>
                             <div class="quiz-options-group" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
                                 ${opts.map((opt)=>`
-                                    <label class="quiz-option-label" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border,#ccc);border-radius:6px;cursor:pointer;background:${currentAnswer===opt?'var(--selected-bg,#e8f0fe)':'transparent'}">
+                                    <label class="quiz-option-label ${currentAnswer===opt?'is-selected':''}">
                                         <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} ${isLocked?'disabled':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
                                         <span>${esc(opt)}</span>
                                     </label>
@@ -208,7 +208,7 @@ function renderQuizSection(){
 }
 
 function studentTabHtml(key,label,index,initialLock){
-    const shortNames={materials:'Kaynaklar',quiz:'Quiz',case:'Vaka',profile:'Profil',initial:names.initial,ai:'AI sohbeti',final:names.final,reflection:'Yansıtma',confirm:'Son teslim'};
+    const shortNames={materials:'Kaynaklar',quiz:'Quiz',case:'Vaka',profile:'Profil',initial:'Forum (Önce)',ai:'AI sohbeti',final:'Forum (Sonra)',reflection:'Yansıtma',confirm:'Son teslim'};
     const isClosed=isCollectionClosed()&&work.application.state!=='submitted';
     const state=sectionLocked(key)?(isClosed&&!['materials','quiz'].includes(key)?'Veri toplama kapalı':'Kilitli'):(initialLock&&['profile','initial'].includes(key))||locked()?'Salt okunur':'';
     const accessible=`${index+1}. ${label}${state?' · '+state:''}`;

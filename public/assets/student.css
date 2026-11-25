@@ -10,8 +10,11 @@ body[data-ui-role="student"] {
     color: var(--ink);
 }
 body[data-ui-role="student"] .masthead {
-    height: 76px;
+    min-height: 76px;
+    height: auto;
+    padding-block: 10px;
     padding-inline: max(24px, calc((100vw - 1160px) / 2));
+    flex-wrap: wrap;
 }
 body[data-ui-role="student"] .brand { font-size: 24px; letter-spacing: -.8px; }
 body[data-ui-role="student"] .brand-sub { font-size: 9px; letter-spacing: 1.2px; }
@@ -181,12 +184,21 @@ body[data-ui-role="student"] .student-tab-state.is-locked { color: #694000; back
 body[data-ui-role="student"] .student-tab-state.is-readonly { color: #40566a; background: #edf2f7; border-color: #aabcca; }
 body[data-ui-role="student"] .tabs .active .student-tab-state.is-locked { color: #ffe5a3; background: #3c4b28; border-color: #c5a956; }
 body[data-ui-role="student"] .tabs .active .student-tab-state.is-readonly { color: #edf4fa; background: #36564e; border-color: #a4bcb3; }
-body[data-ui-role="student"] .student-tab-label { line-height: 1.4; }
+body[data-ui-role="student"] .student-tab-label { line-height: 1.35; overflow-wrap: anywhere; }
 body[data-ui-role="student"] .tabs .error-count { font-size: 11px; }
-@media (max-width: 1000px) {
-    body[data-ui-role="student"] .tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    body[data-ui-role="student"] .tabs button { flex-direction: column; gap: 4px; min-height: 90px; padding: 8px 5px; }
+@media (max-width: 1060px) {
+    body[data-ui-role="student"] .workspace-top { position: static; }
+    body[data-ui-role="student"] .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    body[data-ui-role="student"] .tabs button { flex-direction: row; justify-content: flex-start; text-align: left; gap: 8px; min-height: 58px; padding: 8px 10px; }
+    body[data-ui-role="student"] .student-tab-copy { align-items: flex-start; }
     body[data-ui-role="student"] .student-tab-label { font-size: 12px; }
+}
+@media (max-width: 560px) {
+    body[data-ui-role="student"] .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+    body[data-ui-role="student"] .tabs button { flex-direction: column; justify-content: center; text-align: center; gap: 4px; min-height: 70px; padding: 7px 4px; }
+    body[data-ui-role="student"] .student-tab-copy { align-items: center; }
+    body[data-ui-role="student"] .student-tab-label { font-size: 11px; line-height: 1.25; }
+    body[data-ui-role="student"] .student-tab-state { font-size: 9px; padding: 2px 4px; }
 }
 body[data-ui-role="student"] .tabs button:hover:not(:disabled) { background: #e8eee8; }
 body[data-ui-role="student"] .tabs button.active { background: #203f32; color: #fff; border-color: #203f32; }
@@ -284,14 +296,15 @@ body[data-ui-role="student"] footer { max-width: 1160px; line-height: 1.6; }
     body[data-ui-role="student"] .message.user { margin-left: 18px; margin-right: 0; }
     body[data-ui-role="student"] #initial,
     body[data-ui-role="student"] #submit,
-    body[data-ui-role="student"] #send { width: 100%; text-align: center; }
+    body[data-ui-role="student"] #send,
+    body[data-ui-role="student"] #go-to-quiz,
+    body[data-ui-role="student"] #save-quiz-btn { width: 100%; text-align: center; }
+    body[data-ui-role="student"] .student-step-actions { justify-content: space-between; }
+    body[data-ui-role="student"] .student-step-actions button { flex: 1 1 110px; justify-content: center; }
     body[data-ui-role="student"] #work-confirm { padding: 24px; }
     body[data-ui-role="student"] #work-confirm .row { flex-wrap: wrap; }
     body[data-ui-role="student"] #work-confirm .row button { flex: 1 1 120px; }
     body[data-ui-role="student"] footer { padding: 20px 16px; gap: 8px; }
-}
-@media (max-width: 380px) {
-    body[data-ui-role="student"] .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) {
     body[data-ui-role="student"] button,
@@ -328,12 +341,23 @@ body[data-ui-role="student"] footer { max-width: 1160px; line-height: 1.6; }
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .material-link-btn {
-    transition: background-color 140ms ease;
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--green, #21634d);
+    color: #fff;
+    border-radius: 7px;
+    text-decoration: none;
+    font-weight: 600;
+    text-align: center;
+    transition: background-color 140ms ease, filter 140ms ease;
 }
 .material-link-btn:hover {
-    filter: brightness(0.9);
+    filter: brightness(0.92);
 }
 
 /* Quiz styling */
@@ -342,15 +366,32 @@ body[data-ui-role="student"] footer { max-width: 1160px; line-height: 1.6; }
     border-radius: 10px;
     padding: 20px;
     background: #fff;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .quiz-option-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 1px solid #c5d4cb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
     transition: background-color 140ms ease, border-color 140ms ease;
     margin: 0 !important;
+    font-weight: 500;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.quiz-option-label.is-selected {
+    background: var(--mint, #e7f1eb);
+    border-color: var(--green, #21634d);
 }
 .quiz-option-label input[type="radio"] {
     width: auto !important;
     min-height: 0 !important;
-    margin: 0;
+    margin: 3px 0 0;
     flex-shrink: 0;
 }
 .quiz-option-label:hover {
@@ -365,10 +406,17 @@ body[data-ui-role="student"] footer { max-width: 1160px; line-height: 1.6; }
     width: 100%;
     border-collapse: collapse;
     margin-top: 8px;
+    white-space: normal;
 }
 .materials-quiz-summary th,
 .materials-quiz-summary td {
-    padding: 8px 12px;
+    padding: 10px 12px;
     border: 1px solid var(--line, #e2e8f0);
     text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+.materials-quiz-summary td:first-child,
+.materials-quiz-summary th:first-child {
+    position: static;
 }
