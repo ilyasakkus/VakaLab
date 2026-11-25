@@ -92,12 +92,31 @@ if (!$connected) {
 echo ">> Tablo migration işlemleri yürütülüyor...\n";
 passthru('php ' . escapeshellarg(__DIR__ . '/console.php') . ' migrate');
 
-// Araştırmacı oluştur
+// Araştırmacı oluştur veya şifresini güncelle
 $adminPass = getenv('VAKALAB_ADMIN_PASSWORD');
 if ($adminPass !== false && $adminPass !== '') {
     $adminLogin = getenv('VAKALAB_ADMIN_LOGIN') ?: 'arastirmaci';
-    echo ">> Araştırmacı hesabı kontrol ediliyor ({$adminLogin})...\n";
-    passthru('php ' . escapeshellarg(__DIR__ . '/console.php') . ' researcher ' . escapeshellarg($adminLogin));
+    echo ">> Araştırmacı hesabı ayarlanıyor ({$adminLogin})...\n";
+    require_once __DIR__ . '/../app/bootstrap.php';
+    $db = new Db(cfg());
+    $existing = $db->one('SELECT id FROM users WHERE login=?', [$adminLogin]);
+    if ($existing) {
+        $db->q('UPDATE users SET password=?, status="active" WHERE id=?', [password_hash($adminPass, PASSWORD_DEFAULT), $existing['id']]);
+        echo ">> Araştırmacı parolası güncellendi ({$adminLogin}).\n";
+    } else {
+        $db->insert('users', [
+            'id' => uid(),
+            'login' => $adminLogin,
+            'name' => 'Araştırmacı',
+            'password' => password_hash($adminPass, PASSWORD_DEFAULT),
+            'role' => 'researcher',
+            'status' => 'active',
+            'metadata' => '{}',
+            'test' => 0,
+            'created_at' => now()
+        ]);
+        echo ">> Araştırmacı oluşturuldu ({$adminLogin}).\n";
+    }
 }
 
 // Seed yükle (isteğe bağlı)

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__.'/../app/bootstrap.php';
 ApiRuntime::start();
-header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: same-origin');
+header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: same-origin');header('X-Robots-Tag: noindex, nofollow');
 try{
     $config=cfg();demand($config['env']!=='production'||$config['https'],'Üretimde HTTPS zorunlu',503);
     $db=new Db($config);Migration::forums($db);Migration::research($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
