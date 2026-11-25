@@ -48,11 +48,29 @@ final class Auth {
             $researcher=$owner!==''?$this->db->one("SELECT id FROM users WHERE id=? AND role='researcher' AND status='active'",[$owner]):$this->db->one("SELECT id FROM users WHERE role='researcher' AND status='active' ORDER BY created_at,id LIMIT 1");
             demand((bool)$researcher,'Kayıt şu anda açılamıyor. Yöneticiyle iletişime geçin.',503);
             $normalized=$this->db->sqlite()?"LTRIM(login,'0')":"TRIM(LEADING '0' FROM login)";
-            demand(!$this->db->one("SELECT id FROM users WHERE login=? OR (role='student' AND $normalized=?)",[$number,$number]),'Bu öğrenci numarasıyla zaten bir hesap var. Şifrenizi unuttuysanız yöneticinize başvurun.',409);
+            demand(!$this->db->one("SELECT id FROM users WHERE login=? OR (role='student' AND $normalized=?)",[$number,$number]),'Bu öğrenci numarasıyla zaten bir hesap var. Şifrenizi unuttuysanız giriş ekranından şifrenizi sıfırlayabilirsiniz.',409);
             $u=['id'=>uid(),'login'=>$number,'name'=>$first.' '.$last,'password'=>$hash,'role'=>'student','status'=>'active','owner_id'=>$researcher['id'],'metadata'=>js(['first_name'=>$first,'last_name'=>$last,'self_registered'=>true]),'test'=>cfg()['env']==='test'?1:0,'created_at'=>now()];
             $this->db->insert('users',$u);$this->db->audit($u['id'],'register',$u['id'],'',['login'=>$number]);return $u;
         });}catch(PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new Fault('Bu öğrenci numarasıyla zaten bir hesap var.',409);throw $e;}
         $this->signIn($u);return $u;
+    }
+    public function resetPassword(array $p): array {
+        $this->session();
+        foreach(['student_no','password','password_confirmation'] as $key)demand(isset($p[$key])&&is_string($p[$key]),'Öğrenci numarası ve yeni şifre gerekli');
+        $number=trim($p['student_no']);demand(strlen($number)<=100&&preg_match('/^[0-9]+$/D',$number)===1,'Öğrenci numarası yalnız rakamlardan oluşmalı');
+        $number=ltrim($number,'0');demand($number!=='','Geçerli bir öğrenci numarası girin');
+        $this->throttle('reset|'.$number,5,'Çok fazla deneme yapıldı; 15 dakika bekleyin');
+        demand($p['password']===$p['password_confirmation'],'Şifreler eşleşmiyor');
+        self::validatePassword($p['password']);
+        $normalized=$this->db->sqlite()?"LTRIM(login,'0')":"TRIM(LEADING '0' FROM login)";
+        $u=$this->db->one("SELECT * FROM users WHERE role='student' AND (login=? OR $normalized=?)",[$number,$number]);
+        demand((bool)$u&&$u['status']==='active','Bu öğrenci numarasına ait aktif bir hesap bulunamadı',404);
+        $hash=password_hash($p['password'],PASSWORD_DEFAULT);
+        $this->db->q('UPDATE users SET password=? WHERE id=?',[$hash,$u['id']]);
+        $this->db->audit($u['id'],'reset_password',$u['id'],'',['login'=>$number]);
+        $u['password']=$hash;
+        $this->signIn($u);
+        return $u;
     }
     public static function researcher(array $u): void {demand($u['role']==='researcher','Araştırmacı yetkisi gerekli',403);}
 }

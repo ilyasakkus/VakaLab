@@ -22,9 +22,21 @@ function download(params){window.open('api.php?'+new URLSearchParams({op:'downlo
 async function init(){csrf=(await api('token')).csrf;try{me=await api('me');await home();}catch(e){if(previewToken){$('#root').innerHTML=`<div class="card"><h1>Önizleme açılamadı</h1><p>${esc(e.message)}</p><a href="./">Yönetim paneline dön</a></div>`;}else if(e.status===401)login();else notify(e.message);}}
 function login(){
     delete document.body.dataset.uiRole;me=null;$('#identity').innerHTML='';
-    $('#root').innerHTML=`<div class="card login"><div class="eyebrow">Pedagojik vaka araştırması</div><h1>Çalışma alanınıza<br>hoş geldiniz.</h1><p class="muted">Öğrenci numaranız ve şifreniz ile giriş yapın.</p><form id="login-form"><label for="login">Öğrenci numarası / araştırmacı hesabı</label><input id="login" autocomplete="username" maxlength="100" required><label for="password">Şifre</label><input id="password" type="password" autocomplete="current-password" required><p id="auth-error" class="dialog-error" role="alert" hidden></p><button id="auth-submit">Giriş yap →</button></form><div class="auth-switch"><p>Henüz hesabınız yok mu?</p><button class="secondary" id="show-register">Hesap oluştur</button></div></div>`;
+    $('#root').innerHTML=`<div class="card login"><div class="eyebrow">Pedagojik vaka araştırması</div><h1>Çalışma alanınıza<br>hoş geldiniz.</h1><p class="muted">Öğrenci numaranız ve şifreniz ile giriş yapın.</p><form id="login-form"><label for="login">Öğrenci numarası / araştırmacı hesabı</label><input id="login" autocomplete="username" maxlength="100" required><label for="password">Şifre</label><input id="password" type="password" autocomplete="current-password" required><p id="auth-error" class="dialog-error" role="alert" hidden></p><button id="auth-submit">Giriş yap →</button></form><div class="auth-switch"><button type="button" class="secondary" id="show-reset">Şifremi unuttum</button><p>Henüz hesabınız yok mu?</p><button type="button" class="secondary" id="show-register">Hesap oluştur</button></div></div>`;
+    handler('#show-reset',resetPasswordForm);
     handler('#show-register',registerForm);
     $('#login-form').onsubmit=async e=>{e.preventDefault();await submitAuth('login',{login:getValue('login'),password:getValue('password')});};
+}
+function resetPasswordForm(){
+    $('#root').innerHTML=`<div class="card login"><div class="eyebrow">Şifre sıfırlama</div><h1>Şifremi sıfırla</h1><p class="muted">Öğrenci numaranızı başında sıfır olmadan giriniz. Ardından yeni şifrenizi iki kez girin.</p><form id="reset-form"><label for="reset-student-no">Öğrenci numarası</label><input id="reset-student-no" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="100" autocomplete="username" aria-describedby="reset-no-help" required><small id="reset-no-help">Öğrenci numaranızı başında sıfır olmadan giriniz.</small><label for="reset-password">Yeni şifre</label><input id="reset-password" type="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="reset-password-help" required><small id="reset-password-help">En az 12 karakter kullanın.</small><label for="reset-password-confirm">Yeni şifre (tekrar)</label><input id="reset-password-confirm" type="password" autocomplete="new-password" minlength="12" maxlength="72" required><p id="auth-error" class="dialog-error" role="alert" hidden></p><button id="auth-submit">Şifremi sıfırla →</button></form><div class="auth-switch"><p>Şifrenizi hatırladınız mı?</p><button type="button" class="secondary" id="show-login">Giriş yap</button></div></div>`;
+    $('#reset-student-no').addEventListener('blur',e=>{e.target.value=e.target.value.trim().replace(/^0+/,'');});
+    handler('#show-login',login);
+    $('#reset-form').onsubmit=async e=>{
+        e.preventDefault();
+        const password=getValue('reset-password'),confirm=getValue('reset-password-confirm'),error=$('#auth-error');
+        if(password!==confirm){error.textContent='Şifreler eşleşmiyor.';error.hidden=false;return;}
+        await submitAuth('reset_password',{student_no:getValue('reset-student-no'),password,password_confirmation:confirm});
+    };
 }
 function registerForm(){
     $('#root').innerHTML=`<div class="card login"><div class="eyebrow">Öğrenci kaydı</div><h1>Hesap oluştur</h1><p class="muted">Öğrenci numaranızı başında sıfır olmadan girin. Numaranız giriş için kullanılacaktır.</p><form id="register-form"><label for="student-no">Öğrenci numarası</label><input id="student-no" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="100" autocomplete="username" aria-describedby="student-no-help" required><small id="student-no-help">Yalnız rakam kullanın. Baştaki sıfırlar kaldırılır.</small><label for="first-name">Ad</label><input id="first-name" autocomplete="given-name" maxlength="90" required><label for="last-name">Soyad</label><input id="last-name" autocomplete="family-name" maxlength="90" required><label for="new-password">Şifre</label><input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required><small id="password-help">En az 12 karakter kullanın.</small><p id="auth-error" class="dialog-error" role="alert" hidden></p><button id="auth-submit">Hesap oluştur →</button></form><div class="auth-switch"><p>Zaten hesabınız var mı?</p><button class="secondary" id="show-login">Giriş yap</button></div></div>`;
@@ -34,7 +46,7 @@ function registerForm(){
 }
 async function submitAuth(op,payload){
     const button=$('#auth-submit'),error=$('#auth-error');if(button.disabled)return;button.disabled=true;error.hidden=true;
-    try{const r=await api(op,payload);csrf=r.csrf;me=await api('me');await home();if(op==='register')notify('Hesabınız oluşturuldu. Öğrenci numaranız: '+r.login);}
+    try{const r=await api(op,payload);csrf=r.csrf;me=await api('me');await home();if(op==='register')notify('Hesabınız oluşturuldu. Öğrenci numaranız: '+r.login);else if(op==='reset_password')notify('Şifreniz başarıyla sıfırlandı.');}
     catch(e){error.textContent=e.message;error.hidden=false;button.disabled=false;}
 }
 async function exitPreview(){

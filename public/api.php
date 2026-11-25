@@ -7,11 +7,12 @@ try{
     $config=cfg();demand($config['env']!=='production'||$config['https'],'Üretimde HTTPS zorunlu',503);
     $db=new Db($config);Migration::forums($db);Migration::research($db);Migration::materials($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
     if($_SERVER['REQUEST_METHOD']==='POST'){$auth->csrf();demand((int)($_SERVER['CONTENT_LENGTH']??0)<=1048576,'İstek çok büyük',413);$p=obj(file_get_contents('php://input'));}
-    $writes=['login','register','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic','research'];
+    $writes=['login','register','reset_password','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic','research'];
     if(in_array($op,$writes,true))demand($_SERVER['REQUEST_METHOD']==='POST','POST gerekli',405);
     if($op==='token'){$result=['csrf'=>$_SESSION['csrf']];}
     elseif($op==='login'){$u=$auth->login($p['login']??'',$p['password']??'');$result=['role'=>$u['role'],'csrf'=>$_SESSION['csrf']];}
     elseif($op==='register'){$u=$auth->register($p);$result=['role'=>$u['role'],'login'=>$u['login'],'csrf'=>$_SESSION['csrf']];}
+    elseif($op==='reset_password'){$u=$auth->resetPassword($p);$result=['role'=>$u['role'],'login'=>$u['login'],'csrf'=>$_SESSION['csrf']];}
     elseif($op==='logout'){$_SESSION=[];session_destroy();setcookie('vakalab','',['expires'=>1,'path'=>($config['base_path']?:'').'/','secure'=>$config['https'],'httponly'=>true,'samesite'=>'Strict']);$result=['ok'=>true];}
     elseif($op==='preview'){$u=$auth->user();demand(is_string($p['case_id']??null),'Vaka gerekli');$result=(new Preview(new App($db,$config)))->create($u,$p['case_id']);session_write_close();}
     else{
