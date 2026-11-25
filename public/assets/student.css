@@ -297,3 +297,69 @@ body[data-ui-role="student"] footer { max-width: 1160px; line-height: 1.6; }
     body[data-ui-role="student"] textarea,
     body[data-ui-role="student"] select { transition: none; }
 }
+
+/* Course Materials & Video */
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 */
+    height: 0;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #000;
+    margin: 16px 0 24px;
+}
+.video-container iframe,
+.video-container video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+.material-item-card {
+    border: 1px solid var(--line, #dce5de);
+    border-radius: 8px;
+    padding: 18px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.material-link-btn {
+    transition: background-color 140ms ease;
+}
+.material-link-btn:hover {
+    filter: brightness(0.9);
+}
+
+/* Quiz styling */
+.quiz-card {
+    border: 1px solid var(--line, #dce5de);
+    border-radius: 10px;
+    padding: 20px;
+    background: #fff;
+}
+.quiz-option-label {
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+.quiz-option-label:hover {
+    background: #f0f7f3 !important;
+}
+
+/* Researcher summary */
+.materials-quiz-summary {
+    padding: 8px 0;
+}
+.materials-quiz-summary table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+}
+.materials-quiz-summary th,
+.materials-quiz-summary td {
+    padding: 8px 12px;
+    border: 1px solid var(--line, #e2e8f0);
+    text-align: left;
+}

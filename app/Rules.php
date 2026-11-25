@@ -6,6 +6,16 @@ final class Rules {
         if(array_key_exists('response_mode',$d)){demand($d['response_mode']==='forum','Yanıt düzeni geçersiz');$out['response_mode']='forum';}
         foreach(['knowledge','confidence','difficulty','severity','final_confidence','final_difficulty','final_severity'] as $k){$v=$d[$k]??null;demand($v===null||(is_int($v)&&$v>=0&&$v<=10),'Puan 0–10 tam sayı olmalı');$out[$k]=$v;}
         foreach(['problem','decision','reason','final_decision','final_reason','reflection','question'] as $k){$v=$d[$k]??'';demand(is_string($v)&&strlen($v)<=60000,'Metin sınırı aşıldı');$out[$k]=$v;}
+        if(array_key_exists('quiz_answers',$d)){
+            demand(is_array($d['quiz_answers']),'Quiz yanıtları geçersiz');
+            $cleanQuiz=[];
+            foreach($d['quiz_answers'] as $qk=>$qv){
+                if(is_scalar($qv)&&strlen((string)$qv)<=1000){
+                    $cleanQuiz[(string)$qk]=(string)$qv;
+                }
+            }
+            $out['quiz_answers']=$cleanQuiz;
+        }
         if(array_key_exists('rich_text',$d)){demand(is_array($d['rich_text']),'Editör verisi geçersiz');$rich=RichText::normalize($d['rich_text'],$out);if($rich)$out['rich_text']=$rich;}
         return $out;
     }

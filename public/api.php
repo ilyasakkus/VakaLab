@@ -5,7 +5,7 @@ ApiRuntime::start();
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('Referrer-Policy: same-origin');header('X-Robots-Tag: noindex, nofollow');
 try{
     $config=cfg();demand($config['env']!=='production'||$config['https'],'Üretimde HTTPS zorunlu',503);
-    $db=new Db($config);Migration::forums($db);Migration::research($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
+    $db=new Db($config);Migration::forums($db);Migration::research($db);Migration::materials($db);$auth=new Auth($db);$auth->session();$op=$_GET['op']??'me';$p=[];
     if($_SERVER['REQUEST_METHOD']==='POST'){$auth->csrf();demand((int)($_SERVER['CONTENT_LENGTH']??0)<=1048576,'İstek çok büyük',413);$p=obj(file_get_contents('php://input'));}
     $writes=['login','register','logout','preview','start','save','initial','submit','chat','forum_post','events','onboarding','admin','new_run','step','decision','report','message_labels','holistic','research'];
     if(in_array($op,$writes,true))demand($_SERVER['REQUEST_METHOD']==='POST','POST gerekli',405);

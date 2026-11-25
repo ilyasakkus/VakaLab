@@ -119,7 +119,139 @@ async function previewCase(caseId){
     catch(e){if(target)target.close();notify(e.message);}
 }
 function caseForm(c){
-    showDialog(`<h2>${c?'Vakayı düzenle':'Vaka oluştur'}</h2>${field('c-title','Başlık',c?.title)}${field('c-position','Sıra',c?.position||1,'number')}${field('c-body','Vaka metni',c?.body,'textarea')}${field('c-instructions','Öğrenci yönergeleri',c?.instructions,'textarea')}${select('c-status','Durum',[['draft','Taslak'],['active','Aktif'],['closed','Yeni başlangıçlara kapalı'],['archived','Arşiv']],c?.status||'draft')}${select('c-rubric','Rubrik',[['','Henüz bağlı değil'],...latestDefinitions().filter(d=>d.family==='rubric').map(d=>[d.id,d.name+' · v'+d.version])],c?.rubric_id||'')}<details class="spaced"><summary>Ek ayarlar</summary>${field('c-notes','Özel notlar',c?.notes,'textarea')}<label class="inline-check"><input type="checkbox" id="c-practice" ${Number(c?.practice)?'checked':''}>Deneme vakası</label><label class="inline-check"><input type="checkbox" id="c-stop" ${Number(c?.stop_access)?'checked':''}>Vaka görüntüleme erişimini de durdur</label></details><button class="spaced" id="commit">Vakayı kaydet</button>`,async()=>{await api('admin',{action:'case',...(c?{id:c.id}:{}),title:getValue('c-title'),body:getValue('c-body'),instructions:getValue('c-instructions'),notes:getValue('c-notes'),position:Number(getValue('c-position')),status:getValue('c-status'),rubric_id:getValue('c-rubric'),practice:$('#c-practice').checked,stop_access:$('#c-stop').checked});await adminHome();});
+    const mats = typeof c?.materials === 'string' ? (JSON.parse(c.materials || '{}') || {}) : (c?.materials || {});
+    const rawQuiz = c?.quiz;
+    const quizItems = Array.isArray(rawQuiz) ? rawQuiz : (typeof rawQuiz === 'string' ? (JSON.parse(rawQuiz || '[]') || []) : []);
+    const quizList = Array.isArray(quizItems) ? quizItems : (Array.isArray(quizItems?.questions) ? quizItems.questions : []);
+
+    showDialog(`<h2>${c?'Vakayı düzenle':'Vaka oluştur'}</h2>
+        ${field('c-title','Başlık',c?.title)}
+        ${field('c-position','Sıra',c?.position||1,'number')}
+        ${field('c-body','Vaka metni',c?.body,'textarea')}
+        ${field('c-instructions','Öğrenci yönergeleri',c?.instructions,'textarea')}
+        ${select('c-status','Durum',[['draft','Taslak'],['active','Aktif'],['closed','Yeni başlangıçlara kapalı'],['archived','Arşiv']],c?.status||'draft')}
+        ${select('c-rubric','Rubrik',[['','Henüz bağlı değil'],...latestDefinitions().filter(d=>d.family==='rubric').map(d=>[d.id,d.name+' · v'+d.version])],c?.rubric_id||'')}
+
+        <details class="spaced" open>
+            <summary><b>Ders Kaynakları & Video (Ön Hazırlık)</b></summary>
+            <p class="muted">Öğrenci vaka atandığında bu kaynakları ve videoyu izleyebilir. Veri toplama açılmasa bile bu bölüm açıktır.</p>
+            ${field('c-video-url','Ders Videosu URL (YouTube, Vimeo veya doğrudan MP4 linki)',mats.video_url||'')}
+            ${field('c-video-title','Video Başlığı',mats.video_title||'')}
+            ${field('c-video-desc','Video Açıklaması / Yönergesi',mats.video_desc||'','textarea')}
+            <h4>Ek Ders Materyalleri & Bağlantılar</h4>
+            <div id="c-material-items" class="selection-list"></div>
+            <button type="button" class="secondary" id="add-material-item">+ Ek Materyal / Link Ekle</button>
+        </details>
+
+        <details class="spaced" open>
+            <summary><b>Ön Hazırlık Quizi (Soru ve Seçenekler)</b></summary>
+            <p class="muted">Öğrenci ders kaynaklarını inceledikten sonra bu soruları yanıtlar. Yanıtlar ve tıklamalar öğrenci adına sistemde kaydedilir.</p>
+            <div id="c-quiz-items"></div>
+            <button type="button" class="secondary" id="add-quiz-item">+ Soru Ekle</button>
+        </details>
+
+        <details class="spaced">
+            <summary>Ek ayarlar</summary>
+            ${field('c-notes','Özel notlar',c?.notes,'textarea')}
+            <label class="inline-check"><input type="checkbox" id="c-practice" ${Number(c?.practice)?'checked':''}>Deneme vakası</label>
+            <label class="inline-check"><input type="checkbox" id="c-stop" ${Number(c?.stop_access)?'checked':''}>Vaka görüntüleme erişimini de durdur</label>
+        </details>
+        <button class="spaced" id="commit">Vakayı kaydet</button>`,
+        async()=>{
+            const materialItems=[...document.querySelectorAll('[data-material-row]')].map(row=>({
+                id:row.dataset.id||('mat_'+crypto.randomUUID().slice(0,8)),
+                title:row.querySelector('[data-mat-title]').value.trim(),
+                url:row.querySelector('[data-mat-url]').value.trim(),
+                desc:row.querySelector('[data-mat-desc]').value.trim()
+            })).filter(m=>m.title||m.url);
+
+            const materials={
+                video_url:getValue('c-video-url').trim(),
+                video_title:getValue('c-video-title').trim(),
+                video_desc:getValue('c-video-desc').trim(),
+                items:materialItems
+            };
+
+            const quizQuestions=[...document.querySelectorAll('[data-quiz-row]')].map(row=>{
+                const question=row.querySelector('[data-quiz-question]').value.trim();
+                const options=[...row.querySelectorAll('[data-quiz-option]')].map(el=>el.value.trim()).filter(Boolean);
+                const correct=row.querySelector('[data-quiz-correct]').value.trim();
+                const explanation=row.querySelector('[data-quiz-explanation]').value.trim();
+                return {
+                    id:row.dataset.id||('q_'+crypto.randomUUID().slice(0,8)),
+                    question,
+                    options,
+                    correct,
+                    explanation
+                };
+            }).filter(q=>q.question&&q.options.length);
+
+            await api('admin',{
+                action:'case',
+                ...(c?{id:c.id}:{}),
+                title:getValue('c-title'),
+                body:getValue('c-body'),
+                instructions:getValue('c-instructions'),
+                notes:getValue('c-notes'),
+                position:Number(getValue('c-position')),
+                status:getValue('c-status'),
+                rubric_id:getValue('c-rubric'),
+                practice:$('#c-practice').checked,
+                stop_access:$('#c-stop').checked,
+                materials,
+                quiz:quizQuestions
+            });
+            await adminHome();
+        }
+    );
+
+    const addMatRow=(item={id:'',title:'',url:'',desc:''})=>{
+        const row=document.createElement('div');
+        row.className='card';
+        row.setAttribute('data-material-row','');
+        row.dataset.id=item.id||('mat_'+crypto.randomUUID().slice(0,8));
+        row.innerHTML=`<div class="toolbar"><strong>Materyal / Bağlantı</strong><button type="button" class="secondary" data-remove-mat>Kaldır</button></div>
+            <label>Başlık</label><input type="text" data-mat-title value="${esc(item.title)}" placeholder="Örn. Ders Sunumu (PDF)">
+            <label>URL / Link</label><input type="text" data-mat-url value="${esc(item.url)}" placeholder="https://...">
+            <label>Açıklama</label><input type="text" data-mat-desc value="${esc(item.desc)}" placeholder="Kısa açıklama veya yönerge">`;
+        row.querySelector('[data-remove-mat]').onclick=()=>row.remove();
+        $('#c-material-items').append(row);
+    };
+
+    const addQuizRow=(q={id:'',question:'',options:['',''],correct:'',explanation:''})=>{
+        const row=document.createElement('div');
+        row.className='card';
+        row.setAttribute('data-quiz-row','');
+        row.dataset.id=q.id||('q_'+crypto.randomUUID().slice(0,8));
+        const opts=Array.isArray(q.options)&&q.options.length?q.options:['',''];
+        row.innerHTML=`<div class="toolbar"><strong>Quiz Sorusu</strong><button type="button" class="secondary" data-remove-quiz>Soruyu Kaldır</button></div>
+            <label>Soru Metni</label><textarea data-quiz-question placeholder="Soruyu buraya yazın">${esc(q.question)}</textarea>
+            <div class="quiz-options-container"><label>Seçenekler</label><div data-quiz-options-list></div><button type="button" class="secondary" data-add-option>+ Seçenek Ekle</button></div>
+            <label>Doğru Cevap (Opsiyonel)</label><input type="text" data-quiz-correct value="${esc(q.correct||'')}" placeholder="Doğru seçeneğin tam metni (opsiyonel)">
+            <label>Çözüm / Açıklama Notu (Opsiyonel)</label><textarea data-quiz-explanation placeholder="Açıklama veya doğru yanıt gerekçesi">${esc(q.explanation||'')}</textarea>`;
+        const optsList=row.querySelector('[data-quiz-options-list]');
+        const addOpt=(val='')=>{
+            const optDiv=document.createElement('div');
+            optDiv.className='row';
+            optDiv.style.marginBottom='6px';
+            optDiv.innerHTML=`<input type="text" data-quiz-option value="${esc(val)}" placeholder="Seçenek metni" style="flex:1"><button type="button" class="secondary" data-remove-opt>×</button>`;
+            optDiv.querySelector('[data-remove-opt]').onclick=()=>optDiv.remove();
+            optsList.append(optDiv);
+        };
+        opts.forEach(addOpt);
+        row.querySelector('[data-add-option]').onclick=()=>addOpt('');
+        row.querySelector('[data-remove-quiz]').onclick=()=>row.remove();
+        $('#c-quiz-items').append(row);
+    };
+
+    if(Array.isArray(mats.items)&&mats.items.length){
+        mats.items.forEach(addMatRow);
+    }
+    if(quizList.length){
+        quizList.forEach(addQuizRow);
+    }
+    $('#add-material-item').onclick=()=>addMatRow();
+    $('#add-quiz-item').onclick=()=>addQuizRow();
 }
 function assignmentForm(caseId){
     if(!dash.cases.length){notify('Önce bir vaka ekleyin.');return;}

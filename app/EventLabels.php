@@ -30,12 +30,23 @@ final class EventLabels {
         'forum_reply_selected'=>['Forumda yanıt hedefi seçildi','Tartışma','Yanıt yazılacak mesaj seçildi; yanıtın gönderildiğini göstermez.'],
         'forum_reply_cancelled'=>['Forumda yanıt hedefi kaldırıldı','Tartışma','Yanıt hedefi kaldırıldı; daha önce gönderilmiş bir mesajın silinmesi değildir.'],
         'forum_message_visible'=>['Forum mesaj kartı görünür oldu','Tartışma','Odaklı sayfada mesaj kartının en az 40 pikseli en az 1 saniye görünür gözlendi. Okunduğunu veya Passive/Interactive katılımı kanıtlamaz.'],
+        'material_click'=>['Ders kaynağına tıklandı','Ders Kaynakları','Öğrenci ek ders materyali veya harici bağlantıya tıkladı.'],
+        'video_play'=>['Video oynatıldı','Ders Kaynakları','Ders anlatım videosu oynatılmaya başlandı.'],
+        'video_pause'=>['Video duraklatıldı','Ders Kaynakları','Ders anlatım videosu duraklatıldı veya izleme durumu güncellendi.'],
+        'video_ended'=>['Video tamamlandı','Ders Kaynakları','Ders anlatım videosu sonuna kadar izlendi.'],
+        'quiz_view'=>['Quiz görüntülendi','Quiz','Öğrenci quiz sorularını ve seçeneklerini görüntüledi.'],
+        'quiz_answer'=>['Quiz sorusu yanıtlandı','Quiz','Öğrenci quiz sorusunda seçenek işaretledi veya değiştirdi.'],
+        'quiz_submit'=>['Quiz tamamlandı','Quiz','Öğrenci quiz yanıtlarını kaydetti / tamamladı.'],
     ];
-    public const SECTIONS = ['case'=>'Vaka metni','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];
+    public const SECTIONS = ['materials'=>'Ders kaynakları','quiz'=>'Quiz','case'=>'Vaka metni','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];
     public static function sections(bool $forum=false): array {return $forum?array_replace(self::SECTIONS,['initial'=>'Genel Tartışma Forumu (Önce)','final'=>'Genel Tartışma Forumu (Sonra)']):self::SECTIONS;}
     public static function describe(array $event,bool $forum=false): array {
         [$name,$category,$description] = self::TYPES[$event['type']] ?? ['Tanımlanmamış olay','Tanımlanmamış','Özgün olay kodunu inceleyin.'];
         $p=(is_array($event['payload']??null)?$event['payload']:(json_decode($event['payload']??'{}',true)?:[]));
+        if($event['type']==='material_click'&&!empty($p['title'])){$name='Ders kaynağına tıklandı: '.$p['title'];}
+        if($event['type']==='video_play'&&isset($p['time'])){$description='Ders videosu oynatılıyor (Saniye: '.round((float)$p['time'],1).').';}
+        if($event['type']==='video_pause'&&isset($p['time'])){$description='Ders videosu duraklatıldı (Saniye: '.round((float)$p['time'],1).').';}
+        if($event['type']==='quiz_answer'&&isset($p['question_index'])){$name='Quiz sorusu yanıtlandı (Soru '.((int)$p['question_index']+1).')';}
         if($event['type']==='app_presence'){$name=($p['app_active']??false)?'Vaka sekmesi yeniden etkin':'Vaka sekmesi etkinliğini kaybetti';$description=($p['app_active']??false)?'Bölüm süresi yeniden başladı.':'Sayfa gizli veya pencere odaksız; vaka sekmesi yeniden etkin olana kadar bölüm süresi durur.';}
         if($event['type']==='section_open'&&!empty($p['locked'])){$name=$event['section']==='ai'?'Kilitli AI bölümünü görüntüleme':'Kilitli bölüm görüntüleme';$description='İstenen bölüm kilitliydi; erişim denemesi kaydedildi.';}
         if($forum&&$event['type']==='workflow_confirmed'&&($p['kind']??'')==='initial'){$name='AI öncesi tartışma tamamlandı';$description='Öğrencinin Önce katkıları ve vaka profili kesinleşti; bireysel AI sohbeti açıldı.';}

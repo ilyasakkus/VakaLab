@@ -51,6 +51,7 @@ final class Migration {
         }
         self::forums($db);
         self::research($db);
+        self::materials($db);
     }
 
     // Additive and retryable: safe on existing installs and concurrent first requests.
@@ -74,6 +75,25 @@ final class Migration {
             if($db->one('SELECT version FROM schema_migrations WHERE version=5'))return;
             foreach(explode(';',file_get_contents(__DIR__.'/../migrations/005.sql')) as $sql)if(trim($sql)!=='')$db->pdo->exec($sql);
             $tail=$db->sqlite()?' ON CONFLICT(version) DO NOTHING':' ON DUPLICATE KEY UPDATE version=version';$db->q('INSERT INTO schema_migrations (version,applied_at) VALUES (5,?)'.$tail,[now()]);
+        };
+        if($db->sqlite())$db->tx($apply);else $apply();
+    }
+
+    public static function materials(Db $db): void {
+        if($db->one('SELECT version FROM schema_migrations WHERE version=6'))return;
+        $apply=function()use($db){
+            if($db->one('SELECT version FROM schema_migrations WHERE version=6'))return;
+            if($db->sqlite()){
+                $cols=array_column($db->all('PRAGMA table_info(case_versions)'),'name');
+                if(!in_array('materials',$cols,true))$db->pdo->exec('ALTER TABLE case_versions ADD COLUMN materials TEXT');
+                if(!in_array('quiz',$cols,true))$db->pdo->exec('ALTER TABLE case_versions ADD COLUMN quiz TEXT');
+            }else{
+                $cols=array_column($db->all("SHOW COLUMNS FROM case_versions"),'Field');
+                if(!in_array('materials',$cols,true))$db->pdo->exec('ALTER TABLE case_versions ADD COLUMN materials LONGTEXT');
+                if(!in_array('quiz',$cols,true))$db->pdo->exec('ALTER TABLE case_versions ADD COLUMN quiz LONGTEXT');
+            }
+            $tail=$db->sqlite()?' ON CONFLICT(version) DO NOTHING':' ON DUPLICATE KEY UPDATE version=version';
+            $db->q('INSERT INTO schema_migrations (version,applied_at) VALUES (6,?)'.$tail,[now()]);
         };
         if($db->sqlite())$db->tx($apply);else $apply();
     }

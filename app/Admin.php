@@ -4,7 +4,7 @@ final class Admin {
     public function __construct(private App $app) {}
     public function dashboard(array $u): array {
         Auth::researcher($u);$db=$this->app->db;
-        $cases=$db->all('SELECT c.*,v.body,v.instructions,v.notes,v.version FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.owner_id=? ORDER BY position',[$u['id']]);
+        $cases=$db->all('SELECT c.*,v.body,v.instructions,v.notes,v.version,v.materials,v.quiz FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.owner_id=? ORDER BY position',[$u['id']]);
         $cids=array_column($cases,'id');$inCase=fn($row)=>in_array($row['case_id'],$cids,true);
         $assignments=array_values(array_filter($db->all('SELECT * FROM assignments'),$inCase));
         $apps=array_values(array_filter($db->all('SELECT id,user_id,case_id,version_id,attempt_no,state,initial_at,submitted_at,last_section,last_activity,active_request,excluded,draft FROM applications ORDER BY attempt_no DESC'),$inCase));
@@ -61,7 +61,7 @@ final class Admin {
                 $rubric=($p['rubric_id']??'')?:null;if($rubric){Scope::owned($db,$u,'definitions',$rubric);demand((bool)$db->one("SELECT id FROM definitions WHERE id=? AND family='rubric' AND archived=0 AND deleted_at IS NULL",[$rubric]),'Rubrik yok');}
                 if(!$old)$db->insert('cases',['owner_id'=>$u['id'],'id'=>$id,'title'=>$p['title'],'position'=>(int)($p['position']??1),'status'=>$status,'practice'=>!empty($p['practice'])?1:0,'test'=>$this->app->config['env']==='test'?1:0,'stop_access'=>!empty($p['stop_access'])?1:0,'rubric_id'=>$rubric]);
                 else $db->q('UPDATE cases SET title=?,position=?,status=?,practice=?,stop_access=?,rubric_id=? WHERE id=?',[$p['title'],(int)($p['position']??1),$status,!empty($p['practice'])?1:0,!empty($p['stop_access'])?1:0,$rubric,$id]);
-                $v=(int)($db->one('SELECT MAX(version) n FROM case_versions WHERE case_id=?',[$id])['n']??0)+1;$vid=uid();$db->insert('case_versions',['id'=>$vid,'case_id'=>$id,'version'=>$v,'body'=>$p['body'],'instructions'=>$p['instructions']??'','notes'=>$p['notes']??'','created_at'=>now()]);$db->q('UPDATE cases SET current_version=? WHERE id=?',[$vid,$id]);Forum::ensure($db,$id);break;
+                $v=(int)($db->one('SELECT MAX(version) n FROM case_versions WHERE case_id=?',[$id])['n']??0)+1;$vid=uid();$materials=is_string($p['materials']??null)?$p['materials']:js($p['materials']??[]);$quiz=is_string($p['quiz']??null)?$p['quiz']:js($p['quiz']??[]);$db->insert('case_versions',['id'=>$vid,'case_id'=>$id,'version'=>$v,'body'=>$p['body'],'instructions'=>$p['instructions']??'','notes'=>$p['notes']??'','materials'=>$materials,'quiz'=>$quiz,'created_at'=>now()]);$db->q('UPDATE cases SET current_version=? WHERE id=?',[$vid,$id]);Forum::ensure($db,$id);break;
             case 'assign':case 'assign_bulk':case 'late_access':
                 $case=Scope::owned($db,$u,'cases',$p['case_id']);
                 if($op==='late_access'&&!empty($p['open']))demand((bool)$case['collection_closed_at'],'Ek süre için önce bu vakada veri toplamayı kapatın');

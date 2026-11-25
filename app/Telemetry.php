@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 final class Telemetry {
-    public const TYPES=['section_open','field_focus','text_changed','profile_changed','question_changed','copy','paste','scroll','visibility','focus','heartbeat','offline','online','recovered','response_visible','page_exit','section_leave','workflow_confirmed','message_send','forum_posted','app_presence','forum_open','forum_focus','forum_draft_changed','forum_reply_selected','forum_reply_cancelled','forum_message_visible'];
+    public const TYPES=['section_open','field_focus','text_changed','profile_changed','question_changed','copy','paste','scroll','visibility','focus','heartbeat','offline','online','recovered','response_visible','page_exit','section_leave','workflow_confirmed','message_send','forum_posted','app_presence','forum_open','forum_focus','forum_draft_changed','forum_reply_selected','forum_reply_cancelled','forum_message_visible','material_click','video_play','video_pause','video_ended','quiz_view','quiz_answer','quiz_submit'];
     public function __construct(private App $app) {}
     public function ingest(array $u,string $id,array $p,string $session): array {
         $this->app->access($u,$id);demand($u['role']==='student','Öğrenci olayları gerekli',403);$items=$p['events']??[];demand(is_array($items)&&count($items)<=100,'Olay batch sınırı');
         return $this->app->db->tx(function()use($id,$items,$session){$a=$this->app->db->lock($id);$accepted=[];
-            foreach($items as $e){demand(in_array($e['type']??'',self::TYPES,true),'Bilinmeyen olay');demand(preg_match('/^[a-zA-Z0-9_-]{16,100}$/',$e['key']??'')===1,'Olay kimliği geçersiz');demand(in_array($e['section']??'',['case','profile','initial','ai','final','reflection','confirm'],true),'Bölüm geçersiz');
+            foreach($items as $e){demand(in_array($e['type']??'',self::TYPES,true),'Bilinmeyen olay');demand(preg_match('/^[a-zA-Z0-9_-]{16,100}$/',$e['key']??'')===1,'Olay kimliği geçersiz');demand(in_array($e['section']??'',['materials','quiz','case','profile','initial','ai','final','reflection','confirm'],true),'Bölüm geçersiz');
                 $accepted[]=$e['key'];if($this->app->db->one('SELECT id FROM events WHERE app_id=? AND client_key=?',[$id,$e['key']]))continue;
                 $payload=$e['payload']??[];demand(is_array($payload)&&strlen(js($payload))<12000,'Olay içeriği çok uzun');
                 $terminal=$e['type']==='workflow_confirmed'&&($payload['kind']??'')==='submit';if($a['submitted_at']){if($terminal){foreach($this->app->db->all("SELECT payload FROM events WHERE app_id=? AND type='workflow_confirmed'",[$id]) as $prior)if((obj($prior['payload'])['kind']??'')==='submit')continue 2;}elseif(Navigation::time($e['at']??null)===null||Navigation::time($e['at'])>Navigation::time($a['submitted_at']))continue;}

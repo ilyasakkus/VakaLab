@@ -2,7 +2,7 @@
 const processUiStates=new Map();
 function rememberProcessUi(){const root=document.querySelector('#process-data');if(!root)return;processUiStates.set(root.dataset.appId,{panels:[...root.querySelectorAll('[data-process-panel]')].filter(el=>el.open).map(el=>el.dataset.processPanel),draftField:getValue('process-draft-field'),section:getValue('process-event-section'),search:getValue('process-event-search'),heartbeats:!!document.querySelector('#process-heartbeats')?.checked,sharedForums:!!document.querySelector('#research-forums')?.open});}
 const processFieldNames={knowledge:'Ön bilgi',confidence:'Başlangıç güveni',difficulty:'Algılanan zorluk',severity:'Algılanan ciddiyet',final_confidence:'Nihai güven',final_difficulty:'Nihai algılanan zorluk',final_severity:'Nihai algılanan ciddiyet',problem:'Temel problem',decision:'Başlangıç kararı',reason:'Başlangıç gerekçesi',final_decision:'Nihai karar',final_reason:'Nihai gerekçe',reflection:'Yansıtma',question:'AI mesaj kutusu taslağı',forum_body_before:'Forum taslağı (Önce)',forum_body_after:'Forum taslağı (Sonra)'};
-const processSections={case:'Vaka metni',profile:'Vaka profili',initial:'Başlangıç değerlendirmesi',ai:'AI sohbeti',final:'Nihai değerlendirme',reflection:'Yansıtma',confirm:'Son teslim'};
+const processSections={materials:'Ders kaynakları',quiz:'Ön hazırlık quizi',case:'Vaka metni',profile:'Vaka profili',initial:'Başlangıç değerlendirmesi',ai:'AI sohbeti',final:'Nihai değerlendirme',reflection:'Yansıtma',confirm:'Son teslim'};
 function processObject(value){if(value&&typeof value==='object')return value;try{return JSON.parse(value||'{}');}catch{return {};}}
 function processChanges(before,after){before=processObject(before);after=processObject(after);return Object.keys(processFieldNames).filter(k=>(before[k]??'')!==(after[k]??'')).map(key=>({key,before:before[key]??'',after:after[key]??''}));}
 function processDuration(n){if(n===null||n===undefined||!Number.isFinite(Number(n))||Number(n)<0)return 'Ölçülemedi';n=Math.round(Number(n));return n>=60?`${Math.floor(n/60)} dk ${n%60} sn`:`${n} sn`;}
@@ -46,8 +46,60 @@ function processPresenceSummary(v){
     const unknown=visits.filter(r=>r.duration_seconds===null).length;
     return `<p>Bu vaka için kaydedilebilen sürelerin kısa özetidir. Bölüm bölüm ayrıntı için yukarıdaki “Bölüm geçişleri ve ziyaret süreleri” alanını kullanın.</p><div class="process-summary-grid">${groups.map(([title,description,filter])=>{const items=visits.filter(filter),spans=items.filter(r=>r.duration_seconds!==null).map(r=>[Date.parse(r.start_at)/1000,Date.parse(r.end_at)/1000]).filter(s=>s.every(Number.isFinite));return `<div class="process-summary-item"><h3>${title}</h3><strong>${spans.length?processDuration(processUnion(spans)):items.length?'Ölçülemedi':'Kayıt yok'}</strong><p>${description}</p></div>`;}).join('')}</div><p class="${unknown?'warning':'muted'}">${unknown?`Süresi hesaplanamayan kayıt: ${unknown}. Bu kayıtlar yukarıdaki sürelere dahil değildir; gösterilen toplamlar eksik olabilir.`:'Süresi hesaplanamayan kayıt: 0. Kaydedilen tüm aralıkların süresi hesaplanabildi.'}</p><p class="muted">İşlem yapmadan bekleme de süreye dahildir; bu değerler okuma, düşünme veya dikkat süresini göstermez.</p><details class="process-technical"><summary>Hesaplama ayrıntılarını göster</summary><p>Başlangıç veya bitişi eksik ya da saat sırası geçersiz kayıtlara süre atanmaz. Aynı gruptaki çakışan aralıklar bir kez sayılır. AI yanıt beklemesi çalışma ile aynı anda gerçekleşebilir; bu toplamlara ayrıca eklenmez. Süreler ekranda yuvarlanır; hassas değerler dışa aktarılan dosyalardadır.</p></details>`;
 }
+function processMaterialsQuizHtml(v){
+    const events=v.events||[];
+    const draft=processObject(v.application?.draft);
+    const quizAnswers=draft.quiz_answers||{};
+    const materials=processObject(v.version?.materials);
+    const rawQuiz=v.version?.quiz;
+    const quiz=Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]);
+    const quizList=Array.isArray(quiz)?quiz:(Array.isArray(quiz?.questions)?quiz.questions:[]);
+    const materialClicks={};
+    const videoEvents=[];
+    const quizEvents=[];
+    for(const e of events){
+        const p=processObject(e.payload);
+        if(e.type==='material_click'){
+            const key=p.title||p.url||p.id||'Bilinmeyen Materyal';
+            if(!materialClicks[key])materialClicks[key]={title:key,url:p.url,count:0,lastAt:e.client_at||e.received_at};
+            materialClicks[key].count++;
+            materialClicks[key].lastAt=e.client_at||e.received_at;
+        }else if(e.type==='video_play'||e.type==='video_pause'||e.type==='video_ended'){
+            videoEvents.push({type:e.type,time:p.time,at:e.client_at||e.received_at});
+        }else if(e.type==='quiz_answer'||e.type==='quiz_submit'){
+            quizEvents.push({type:e.type,at:e.client_at||e.received_at,answer:p.answer,question:p.question_id});
+        }
+    }
+    const clickRows=Object.values(materialClicks);
+    const plays=videoEvents.filter(x=>x.type==='video_play').length;
+    const pauses=videoEvents.filter(x=>x.type==='video_pause').length;
+    const completed=videoEvents.some(x=>x.type==='video_ended');
+    const lastVideoAt=videoEvents.length?videoEvents[videoEvents.length-1].at:null;
+    return `<details data-process-panel="materials-quiz" open><summary>Ders Kaynakları ve Ön Hazırlık Quiz Etkileşimleri</summary>
+        <div class="materials-quiz-summary">
+            <h3>Ders Videosu İzleme İstatistikleri</h3>
+            <p>${materials.video_url?`<b>Tanımlı Video:</b> ${esc(materials.video_title||materials.video_url)}`:''}</p>
+            <ul>
+                <li>Oynatma (Play) sayısı: <b>${plays}</b></li>
+                <li>Duraklatma (Pause) sayısı: <b>${pauses}</b></li>
+                <li>Tamamlama durumu: <b>${completed?'Video sonuna kadar izlendi':(plays>0?'İzleme devam etti / duraklatıldı':'Henüz izlenmedi')}</b></li>
+                ${lastVideoAt?`<li>Son video etkileşimi: ${displayTime(lastVideoAt)}</li>`:''}
+            </ul>
+            <h3>Ek Ders Materyalleri Tıklama Kayıtları</h3>
+            ${clickRows.length?`<div class="table-wrap"><table><thead><tr><th>Materyal / Bağlantı</th><th>Tıklama Sayısı</th><th>Son Tıklama Zamanı</th></tr></thead><tbody>${clickRows.map(m=>`<tr><td><b>${esc(m.title)}</b>${m.url?`<br><small><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.url)}</a></small>`:''}</td><td>${m.count} kez</td><td>${displayTime(m.lastAt)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Öğrenci henüz ek ders materyallerine tıklamadı.</p>'}
+            <h3>Ön Hazırlık Quizi Yanıtları</h3>
+            ${quizList.length?`<div class="table-wrap"><table><thead><tr><th>Soru</th><th>Öğrencinin Yanıtı</th><th>Doğru Cevap</th><th>Durum</th></tr></thead><tbody>${quizList.map((q,idx)=>{
+                const ans=quizAnswers[q.id]??quizAnswers[idx];
+                const hasAnswer=ans!==undefined&&ans!==null&&ans!=='';
+                const isCorrect=q.correct!==undefined&&q.correct!==''?String(ans)===String(q.correct):null;
+                return `<tr><td><strong>${idx+1}. ${esc(q.question)}</strong></td><td>${hasAnswer?`<span class="pill">${esc(ans)}</span>`:'<span class="muted">Boş</span>'}</td><td>${q.correct!==undefined&&q.correct!==''?`<span class="pill">${esc(q.correct)}</span>`:'<span class="muted">—</span>'}</td><td>${isCorrect===true?'<b style="color:var(--success,#2e7d32)">✓ Doğru</b>':isCorrect===false?'<b style="color:var(--danger,#c62828)">✗ Yanlış</b>':'<span class="muted">—</span>'}</td></tr>`;
+            }).join('')}</tbody></table></div>`:'<p class="muted">Bu vakada tanımlı quiz sorusu bulunmuyor.</p>'}
+        </div>
+    </details>`;
+}
 function processDataHtml(v){const a=v.application,timing=v.timing||{},forum=typeof VakaResearchForum!=='undefined'&&VakaResearchForum.isForum(v),sectionNames=typeof VakaResearchForum!=='undefined'?VakaResearchForum.sections(v):processSections,trackedEvents=typeof VakaResearchForum!=='undefined'?VakaResearchForum.eventRows(v):v.events,revisions=[...(v.draft_revisions||[])].sort((a,b)=>Number(a.revision)-Number(b.revision));
     return `<div class="card" id="process-data" data-app-id="${esc(a.id)}"><div class="toolbar"><h2>Öğrenci yanıtları ve çalışma süreci</h2></div><p class="muted">Kayıtlar aşağıda okunabilir biçimde gösterilir. Ayrıntılı veri analizi için üstteki Ham JSON indir veya Disco CSV indir seçeneğini kullanabilirsiniz.</p>
+    ${processMaterialsQuizHtml(v)}
     <details data-process-panel="notes"><summary>İç not geçmişi (öğrenciye gösterilmez)</summary><div class="toolbar"><button class="secondary" id="add-note">İç araştırmacı notu ekle</button></div>${v.research_notes.map(n=>`<article class="process-entry"><p>${displayTime(n.created_at)}</p><div class="prose">${esc(n.body)}</div>${n.reason?`<p>Gerekçe: ${esc(n.reason)}</p>`:''}</article>`).join('')||'<p>İç not yok.</p>'}</details>
     <details data-process-panel="case"><summary>1. Öğrencinin gördüğü vaka</summary><p>Vaka sürümü ${esc(v.version.version)}</p><div class="prose">${esc(v.version.body)}</div>${v.version.instructions?`<h3>Yönerge</h3><div class="prose">${esc(v.version.instructions)}</div>`:''}</details>
     <details data-process-panel="answers"><summary>${forum?'Vaka profili, yansıtma ve kesinleşen kayıtlar':'2. Öğrencinin yanıtları ve kesinleşen kayıtlar'}</summary><h3>${forum?'Vaka profili ve yansıtma':'Son kayıtlı yanıtlar'}</h3><p>${forum?'Önce aşaması':'Başlangıç'}: ${a.initial_at?'Kesinleştirildi; değiştirilemez.':'Henüz kesinleştirilmedi.'} · Son teslim: ${a.submitted_at?'Teslim edildi; değiştirilemez.':'Henüz teslim edilmedi.'}</p>${processAnswers(a.draft,forum?['knowledge','confidence','difficulty','severity','final_confidence','final_difficulty','final_severity','reflection']:Object.keys(processFieldNames))}${processSnapshotComparison(v.snapshots,forum)}${forum?VakaResearchForum.confirmedHtml(v):''}</details>

@@ -20,13 +20,13 @@ final class App {
             $s=$this->db->one('SELECT * FROM assignments WHERE user_id=? AND case_id=?'.($this->db->sqlite()?'':' FOR UPDATE'),[$u['id'],$case]);demand($s&&(bool)$s['active'],'Vaka atanmadı',403);
             $c=$this->db->one('SELECT * FROM cases WHERE id=?',[$case]);$existing=$this->db->one('SELECT * FROM applications WHERE user_id=? AND case_id=? ORDER BY attempt_no DESC LIMIT 1',[$u['id'],$case]);
             if($existing)return $this->access($u,$existing['id']);
-            demand($c&&$c['status']==='active'&&!$c['stop_access'],'Yeni başlangıç kapalı',403);demand(!Scope::collectionClosed($c+$s),'Bu vakada veri toplama kapalı',409);
+            demand($c&&$c['status']==='active'&&!$c['stop_access'],'Yeni başlangıç kapalı',403);
             $a=['id'=>uid(),'user_id'=>$u['id'],'case_id'=>$case,'version_id'=>$c['current_version'],'state'=>'initial','revision'=>0,'draft'=>js(Rules::draft([])),'created_at'=>now()];$this->db->insert('applications',$a);return $this->db->one('SELECT * FROM applications WHERE id=?',[$a['id']]);
         }));
     }
     public function view(array $u,string $id): array {
         $a=$this->access($u,$id);$v=$this->db->one('SELECT * FROM case_versions WHERE id=?',[$a['version_id']]);
-        $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions']], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
+        $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions'],'materials'=>$v['materials']??'{}','quiz'=>$v['quiz']??'[]'], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
         $result['forum_participation']=['before'=>0,'after'=>0];foreach($this->db->all('SELECT f.phase,COUNT(*) n FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id WHERE p.app_id=? GROUP BY f.phase',[$id]) as $count)$result['forum_participation'][$count['phase']]=(int)$count['n'];
         if($u['role']==='researcher'){
             foreach(['events','draft_revisions','ai_requests','analysis_runs','reports','research_notes'] as $t)$result[$t]=$this->db->all('SELECT * FROM '.$t.' WHERE app_id=?'.($t==='analysis_runs'?' ORDER BY created_at,id':''),[$id]);
@@ -50,10 +50,16 @@ final class App {
         $this->access($u,$id);demand($u['role']==='student','Öğrenci hesabı gerekli',403);
         return self::studentApplication($this->db->tx(function()use($u,$id,$p,$action){$a=$this->db->lock($id);
             if(($action==='initial'&&$a['initial_at'])||($action==='submit'&&$a['submitted_at']))return $a;
-            demand(!Scope::collectionClosed($this->access($u,$id)),'Bu vakada veri toplama kapalı',409);
+            if($action==='initial'||$action==='submit')demand(!Scope::collectionClosed($this->access($u,$id)),'Bu vakada veri toplama kapalı',409);
             demand($a['state']!=='submitted','Teslim edilmiş çalışma değişmez',409);
             demand((int)($p['revision']??-1)===(int)$a['revision'],'Sürüm çakışması. Metninizi kopyalayın ve yeniden yükleyin.',409);
             $d=Rules::draft($p['draft']??[]);$old=obj($a['draft']);
+            if(Scope::collectionClosed($this->access($u,$id))){
+                demand($action==='save','Bu vakada veri toplama kapalı',409);
+                foreach(['knowledge','confidence','difficulty','severity','problem','decision','reason','final_decision','final_reason','reflection','question','final_confidence','final_difficulty','final_severity'] as $k){
+                    demand(($d[$k]??null)===($old[$k]??null),'Veri toplama açılmadan bu alanlar düzenlenemez',409);
+                }
+            }
             if(($old['response_mode']??'')==='forum')demand(($d['response_mode']??'')==='forum','Forum yanıt düzeni değiştirilemez',409);
             if($a['initial_at'])foreach(['knowledge','confidence','difficulty','severity','problem','decision','reason'] as $k)demand($d[$k]===$old[$k],'Başlangıç ve profil kilitli',409);
             if(!$a['initial_at'])foreach(['final_decision','final_reason','reflection','final_confidence','final_difficulty','final_severity','question'] as $k)demand($d[$k]===($old[$k]??null),'Önce başlangıcı kesinleştirin',409);

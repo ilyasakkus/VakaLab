@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Presence-bounded visits. Outside-app intervals are explicit, never charged to a section.
 final class Navigation {
-    public const TABS=['case'=>'Vaka','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];
+    public const TABS=['materials'=>'Ders kaynakları','quiz'=>'Quiz','case'=>'Vaka','profile'=>'Vaka profili','initial'=>'Başlangıç değerlendirmesi','ai'=>'AI sohbeti','final'=>'Nihai değerlendirme','reflection'=>'Yansıtma','confirm'=>'Son teslim','outside'=>'Vaka sekmesi etkin değil','away'=>'Vaka dışında'];
     public static function time(?string $value): ?float {
         if(!$value||!preg_match('/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/',$value))return null;
         try{$date=new DateTimeImmutable($value);$errors=DateTimeImmutable::getLastErrors();if($errors&&($errors['warning_count']||$errors['error_count']))return null;return (float)$date->format('U.u');}catch(Throwable){return null;}

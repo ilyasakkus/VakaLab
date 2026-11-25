@@ -8,7 +8,7 @@ function forumDraftPending(phase){return forumViews.some(view=>(!phase||view.pha
 let me,csrf,work,section='case',saveTimer,saveChain=Promise.resolve(),dirty=false,saving=false,conflict=false,busy=false,readOnlyTab=false,events=[],seq=0,dash,leaseTimer,heartbeatTimer,lastInput=Date.now(),lastEvent=0;
 const previewToken=new URLSearchParams(location.search).get('preview')||'';
 const tab=sessionStorage.getItem('vakalab:tab')||crypto.randomUUID();sessionStorage.setItem('vakalab:tab',tab);
-const names={case:'Vaka',profile:'Vaka profili',initial:'Genel Tartışma Forumu (Önce)',ai:'AI sohbeti',final:'Genel Tartışma Forumu (Sonra)',reflection:'Yansıtma',confirm:'Son teslim'};
+const names={materials:'Ders kaynakları',quiz:'Ön hazırlık quizi',case:'Vaka',profile:'Vaka profili',initial:'Genel Tartışma Forumu (Önce)',ai:'AI sohbeti',final:'Genel Tartışma Forumu (Sonra)',reflection:'Yansıtma',confirm:'Son teslim'};
 const stateName=s=>({initial:'Başlangıç aşamasında',working:'Devam ediyor',submitted:'Teslim edildi'}[s]||'Açmadı');
 const notify=t=>{ $('#notice').textContent=t;clearTimeout(notify.timer);notify.timer=setTimeout(()=>$('#notice').textContent='',9000);};
 async function api(op,body,params={}){const r=await fetch('api.php?'+new URLSearchParams({op,...(previewToken?{preview:previewToken}:{}),...params}),{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:body===undefined?undefined:JSON.stringify(body)});let j;try{j=await r.json();}catch{const e=new Error('Sunucudan geçerli yanıt alınamadı. Durumu yenileyip yeniden deneyin.');e.status=r.status;throw e;}if(!r.ok){const e=new Error(j.error||'İstek başarısız');e.status=r.status;if(r.status===401&&me)notify('Oturum sona erdi. Metin kurtarma taslağı bu sekmede korunuyor; aynı hesapla yeniden giriş yapın.');throw e;}return j.data;}
@@ -43,7 +43,7 @@ async function exitPreview(){
 
 function releaseLease(){clearInterval(leaseTimer);if(!me||!work)return;const key=`lease:${me.id}:${work.application.id}`;try{const old=JSON.parse(localStorage.getItem(key)||'null');if(old?.tab===tab)localStorage.removeItem(key);}catch{} }
 async function home(){destroyForums();if(typeof VakaEditor!=='undefined')VakaEditor.destroyAll();destroyChatView();document.body.dataset.uiRole=me.role;releaseLease();clearInterval(heartbeatTimer);work=null;if(me.preview_app_id){$('#identity').innerHTML='<span>Öğrenci önizlemesi</span><button class="secondary" id="exit-preview">Yönetim paneline dön</button>';handler('#exit-preview',exitPreview);$('#banner').textContent='ÖĞRENCİ ÖNİZLEMESİ · Bu deneme araştırma verilerine eklenmez. '+(me.mock?'AI yanıtları sentetiktir.':'AI sohbeti yapılandırılmış sağlayıcıyı kullanır.');await openWork(me.preview_app_id);return;}$('#identity').innerHTML=`<span>${esc(me.login)} · ${me.role==='researcher'?'Araştırmacı':'Öğrenci'}</span><button class="secondary" id="logout">Çıkış</button>`;handler('#logout',async()=>{if((dirty||forumDraftPending())&&!(await confirmStudent('Kaydedilmemiş metin var. Çıkışta bu sekmedeki kurtarma taslakları temizlenir. Çıkılsın mı?')))return;event('section_leave',{reason:'logout'});await drainEvents();await api('logout',{});releaseLease();clearInterval(heartbeatTimer);work=null;viewId=null;for(const k of Object.keys(sessionStorage))if(k.startsWith('vakalab:'))sessionStorage.removeItem(k);location.reload();});$('#banner').textContent=me.mock?'SENTETİK TEST ORTAMI · Mock yanıtlar gerçek AI değerlendirmesi değildir.':'';if(me.role==='researcher')await adminHome();else await studentHome();}
-async function studentHome(){const cases=await api('cases');$('#root').innerHTML=`<div class="eyebrow">Çalışma alanım</div><h1>Her vaka, yeni bir bakış açısı.</h1><p class="intro">Önce vaka arkadaşlarınızla tartışın. Ardından bireysel AI sohbetine geçin ve nihai görüşünüzü (Sonra) forumunda paylaşın. Yanıtlarınız bölüm geçişlerinde korunur.</p><div class="toolbar"><h2>Vakalarım <span class="pill">${cases.length} atama</span></h2></div><div class="cards">${cases.map((c,i)=>`<article class="card"><div class="case-num"><strong>${String(i+1).padStart(2,'0')}</strong><span class="pill">${c.collection_closed_at&&!Number(c.allow_late)?'Veri toplama kapalı':esc(stateName(c.state))}</span></div><h2>${esc(c.title)}</h2><p class="muted">${c.practice?'Deneme vakası · Araştırma dışı':'Pedagojik vaka · Ortak tartışma ve bireysel AI sohbeti'}${c.attempt_no?' · Deneme '+c.attempt_no:''}</p><button data-case="${c.id}" ${c.collection_closed_at&&!Number(c.allow_late)&&!c.app_id?'disabled':''}>${c.state==='submitted'||(c.collection_closed_at&&!Number(c.allow_late))?'Görüntüle':c.app_id?'Devam et':'Başla'} →</button></article>`).join('')||'<div class="empty">Henüz atanmış aktif vaka yok.</div>'}</div>`;document.querySelectorAll('[data-case]').forEach(b=>b.onclick=async()=>{try{const a=await api('start',{case_id:b.dataset.case});await openWork(a.id);}catch(e){notify(e.message);}});}
+async function studentHome(){const cases=await api('cases');$('#root').innerHTML=`<div class="eyebrow">Çalışma alanım</div><h1>Her vaka, yeni bir bakış açısı.</h1><p class="intro">Önce ders kaynaklarını ve quizi tamamlayın. Ardından arkadaşlarınızla tartışın ve bireysel AI sohbetine geçin. Yanıtlarınız bölüm geçişlerinde korunur.</p><div class="toolbar"><h2>Vakalarım <span class="pill">${cases.length} atama</span></h2></div><div class="cards">${cases.map((c,i)=>`<article class="card"><div class="case-num"><strong>${String(i+1).padStart(2,'0')}</strong><span class="pill">${c.collection_closed_at&&!Number(c.allow_late)?'Ön hazırlık aşamasında':esc(stateName(c.state))}</span></div><h2>${esc(c.title)}</h2><p class="muted">${c.practice?'Deneme vakası · Araştırma dışı':'Pedagojik vaka · Ders kaynakları, quiz ve vaka incelemesi'}${c.attempt_no?' · Deneme '+c.attempt_no:''}</p><button data-case="${c.id}">${c.state==='submitted'?'Görüntüle':c.app_id?'Devam et':'Başla'} →</button></article>`).join('')||'<div class="empty">Henüz atanmış aktif vaka yok.</div>'}</div>`;document.querySelectorAll('[data-case]').forEach(b=>b.onclick=async()=>{try{const a=await api('start',{case_id:b.dataset.case});await openWork(a.id);}catch(e){notify(e.message);}});}
 function showDialog(html,fn){
     const d=document.createElement('dialog');d.innerHTML=html+'<button class="secondary spaced" id="dialog-close">Kapat / İptal</button>';
     const error=document.createElement('div');error.id='dialog-error';error.className='dialog-error';error.setAttribute('role','alert');error.tabIndex=-1;error.hidden=true;
@@ -55,14 +55,19 @@ function showDialog(html,fn){
 function confirmStudent(message){return new Promise(resolve=>{const d=document.createElement('dialog');d.id='work-confirm';d.setAttribute('aria-labelledby','work-confirm-title');d.innerHTML=`<h2 id="work-confirm-title">Onay</h2><p>${esc(message)}</p><div class="row"><button id="work-confirm-accept">Onayla</button><button class="secondary" id="work-confirm-cancel" autofocus>Vazgeç</button></div>`;d.addEventListener('close',()=>{const accepted=d.returnValue==='confirm';d.remove();resolve(accepted);},{once:true});d.querySelector('#work-confirm-accept').onclick=()=>d.close('confirm');d.querySelector('#work-confirm-cancel').onclick=()=>d.close('cancel');document.body.append(d);d.showModal();});}
 function recoveryKey(){return `vakalab:${me.id}:${work.application.id}:${work.version.id}`;}
 function localSave(){if(work&&dirty)sessionStorage.setItem(recoveryKey(),JSON.stringify({revision:Number(work.application.revision),draft:work.draft}));}
-async function openWork(id){work=await api('view',undefined,{app_id:id});viewId=crypto.randomUUID();visitEditedFields=new Set();work.draft=JSON.parse(work.application.draft);validationScope=null;dirty=false;conflict=false;busy=!!work.application.active_request;section=work.application.last_section||'case';const key=`lease:${me.id}:${id}`;
+async function openWork(id){work=await api('view',undefined,{app_id:id});viewId=crypto.randomUUID();visitEditedFields=new Set();work.draft=JSON.parse(work.application.draft);validationScope=null;dirty=false;conflict=false;busy=!!work.application.active_request;section=work.application.last_section||'materials';if(sectionLocked(section))section='materials';const key=`lease:${me.id}:${id}`;
     const check=()=>{const old=JSON.parse(localStorage.getItem(key)||'null');readOnlyTab=!!old&&old.tab!==tab&&Date.now()-old.at<20000;if(!readOnlyTab)localStorage.setItem(key,JSON.stringify({tab,at:Date.now()}));};check();clearInterval(leaseTimer);leaseTimer=setInterval(check,5000);
     events=JSON.parse(sessionStorage.getItem(recoveryKey()+':events')||'[]');seq=Math.max(Number(sessionStorage.getItem(recoveryKey()+':seq')||0),...events.map(e=>e.seq));
     const recovery=sessionStorage.getItem(recoveryKey());if(recovery&&work.application.state!=='submitted'&&!readOnlyTab){const r=JSON.parse(recovery);if(r.revision===Number(work.application.revision)&&(await confirmStudent('Bu hesap ve vaka için sunucuya ulaşmamış taslak bulundu. Kurtarılsın mı?'))){work.draft=r.draft;dirty=true;event('recovered');}else if(r.revision!==Number(work.application.revision))notify('Eski kurtarma taslağı korunuyor; sunucu sürümü değiştiği için otomatik uygulanmadı.');}
     clearInterval(heartbeatTimer);if(work.application.state!=='submitted')heartbeatTimer=setInterval(()=>{event('heartbeat');flushEvents();if(busy)refreshChat().catch(()=>{});},me.config.heartbeat_ms);renderWork();event('section_open');flushEvents();if(dirty)scheduleSave();
 }
-function locked(){return work.application.state==='submitted'||(work.application.collection_closed_at&&!Number(work.application.allow_late))||readOnlyTab||conflict;}
-function sectionLocked(s){return !work.application.initial_at&&['ai','final','reflection','confirm'].includes(s);}
+function isCollectionClosed(){return !!(work?.application?.collection_closed_at&&!Number(work.application.allow_late));}
+function locked(){return work.application.state==='submitted'||(isCollectionClosed()&&section!=='materials'&&section!=='quiz')||readOnlyTab||conflict;}
+function sectionLocked(s){
+    if(s==='materials'||s==='quiz')return false;
+    if(isCollectionClosed()&&work.application.state!=='submitted')return true;
+    return !work.application.initial_at&&['ai','final','reflection','confirm'].includes(s);
+}
 let navigatingWork=false;
 function adjacentSection(direction){const keys=Object.keys(names);return keys[keys.indexOf(section)+direction]||null;}
 function stepControls(){
@@ -89,14 +94,115 @@ function mountStudentEditors(){
     document.querySelectorAll('#section-body textarea').forEach(textarea=>VakaEditor.mount(textarea,{delta:target.draft.rich_text?.[textarea.id],onChange:delta=>{if(work!==target)return;if(delta){target.draft.rich_text??={};target.draft.rich_text[textarea.id]=delta;}else removeRichText(target.draft,textarea.id);},onError:error=>notify(error.message+' Metniniz düz metin olarak korunuyor.')}));
 }
 
-function studentTabHtml(key,label,index,initialLock){
-    const shortNames={case:'Vaka',profile:'Profil',initial:names.initial,ai:'AI sohbeti',final:names.final,reflection:'Yansıtma',confirm:'Son teslim'};
-    const state=sectionLocked(key)?'Kilitli':(initialLock&&['profile','initial'].includes(key))||locked()?'Salt okunur':'';
-    const accessible=`${index+1}. ${label}${state?' · '+state:''}`;
-    return `<button data-section="${key}" class="${section===key?'active':''}" aria-current="${section===key?'step':'false'}" aria-label="${esc(accessible)}" title="${esc(accessible)}"><span class="student-tab-number" aria-hidden="true">${index+1}</span><span class="student-tab-copy"><span class="student-tab-label">${shortNames[key]}</span>${state?`<span class="student-tab-state ${state==='Kilitli'?'is-locked':'is-readonly'}" aria-hidden="true">${state==='Kilitli'?'🔒 Kilitli':'Salt okunur'}</span>`:''}</span></button>`;
+const materialClickCounts=new Map();
+function trackMaterialClick(id,title,url){
+    const key=work?work.application.id+':'+id:id;
+    const count=(materialClickCounts.get(key)||0)+1;
+    materialClickCounts.set(key,count);
+    event('material_click',{id,title,url,click_count:count});
+    flushEvents();
 }
-function renderWork(){destroyForums();if(typeof VakaEditor!=='undefined')VakaEditor.destroyAll();destroyChatView();const a=work.application,d=work.draft,initialLock=!!a.initial_at||locked();if(a.state!=='submitted')d.response_mode='forum';$('#root').innerHTML=`<div class="student-work-heading"><div class="toolbar"><div><div class="eyebrow">Vaka çalışma alanı · sürüm ${work.version.version} · Deneme ${a.attempt_no}</div><h1>${esc(a.case_title||'Pedagojik vaka')}</h1></div><div class="row"><span class="pill">${esc(stateName(a.state))}</span><span id="save-status" class="status">${dirty?'Kaydedilmemiş değişiklik var':'Sunucudaki sürüm yüklendi'}</span><button id="back" class="secondary">${me.preview_app_id?'← Yönetim paneli':'← Vakalarım'}</button>${stepControls()}</div></div>${work.attempts?.length>1?`<div class="row" aria-label="Vaka denemeleri">${work.attempts.map(t=>`<button class="secondary" data-student-attempt="${t.id}" ${t.id===a.id?'disabled':''}>Deneme ${t.attempt_no} · ${esc(stateName(t.state))}</button>`).join('')}</div>`:''}</div><div class="workspace-top"><nav class="tabs" aria-label="Çalışma bölümleri">${Object.entries(names).map(([k,v],i)=>studentTabHtml(k,v,i,initialLock)).join('')}</nav></div><div class="section">${a.collection_closed_at&&!Number(a.allow_late)?'<p class="warning">Bu vakada veri toplama kapalı. Kayıtlarınızı görüntüleyebilirsiniz; değişiklik yapılamaz.</p>':''}${readOnlyTab?'<p class="warning">Bu vaka başka sekmede açık. Bu sekme salt okunur. Diğer sekmeyi kapattıktan 20 saniye sonra yeniden yükleyin.</p>':''}${conflict?'<p class="warning">Sürüm çakışması: taslağı kopyalayıp sunucu sürümünü yeniden yükleyin.</p>':''}${section==='confirm'?'<div id="validation-summary" class="validation-summary" role="alert" hidden></div>':''}<div class="card" id="section-body"></div>${section==='confirm'?reportLinks():''}</div>`;
-    let html='';if(sectionLocked(section))html='<h2>Bu bölüm henüz açık değil</h2><p>Genel Tartışma Forumu (Önce) aşamasını tamamladığınızda AI sohbeti, nihai değerlendirme, yansıtma ve son teslim bölümleri açılacaktır.</p>';
+
+function renderMaterialsSection(){
+    const mats=typeof work.version.materials==='string'?processObject(work.version.materials):(work.version.materials||{});
+    const videoUrl=(mats.video_url||'').trim();
+    const videoTitle=(mats.video_title||'').trim()||'Ders Konu Anlatım Videosu';
+    const videoDesc=(mats.video_desc||'').trim();
+    const items=Array.isArray(mats.items)?mats.items:[];
+
+    let embedHtml='';
+    if(videoUrl){
+        const ytMatch=videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+        const vimeoMatch=videoUrl.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/i);
+
+        if(ytMatch){
+            const videoId=ytMatch[1];
+            embedHtml=`<div class="video-container"><iframe id="study-video-iframe" src="https://www.youtube.com/embed/${videoId}?enablejsapi=1" title="${esc(videoTitle)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
+        }else if(vimeoMatch){
+            const vimeoId=vimeoMatch[3];
+            embedHtml=`<div class="video-container"><iframe id="study-video-iframe" src="https://player.vimeo.com/video/${vimeoId}" title="${esc(videoTitle)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
+        }else{
+            embedHtml=`<div class="video-container"><video id="study-html5-video" controls style="width:100%;max-height:480px;border-radius:8px;background:#000;"><source src="${esc(videoUrl)}">Tarayıcınız video etiketini desteklemiyor.</video></div>`;
+        }
+    }
+
+    return `<span class="eyebrow">Ön hazırlık · Ders kaynakları</span>
+        <h2>${esc(videoTitle)}</h2>
+        ${videoDesc?`<div class="prose" style="margin-bottom:16px;">${esc(videoDesc)}</div>`:''}
+        ${embedHtml?embedHtml:'<div class="empty">Bu vaka için video bağlantısı eklenmemiştir.</div>'}
+        
+        <div class="materials-links-section" style="margin-top:28px;">
+            <h3>Ek Ders Materyalleri & Kaynaklar</h3>
+            ${items.length?`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px;">
+                ${items.map(item=>`
+                    <article class="card material-item-card">
+                        <h4>${esc(item.title||'Ders Materyali')}</h4>
+                        ${item.desc?`<p class="muted">${esc(item.desc)}</p>`:''}
+                        <a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="material-link-btn" data-track-material="${esc(item.id)}" data-title="${esc(item.title||'Materyal')}" data-url="${esc(item.url)}" style="display:inline-block;margin-top:8px;padding:8px 14px;background:var(--accent,#0056b3);color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">
+                            Kaynağı Aç / İncele ↗
+                        </a>
+                    </article>
+                `).join('')}
+            </div>`:'<p class="muted">Ek ders materyali bulunmuyor.</p>'}
+        </div>
+        <div class="row spaced" style="margin-top:24px;">
+            <button type="button" id="go-to-quiz" class="primary">Ön Hazırlık Quizine Geç →</button>
+        </div>`;
+}
+
+function renderQuizSection(){
+    const rawQuiz=work.version.quiz;
+    const quizItems=Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]);
+    const quizList=Array.isArray(quizItems)?quizItems:(Array.isArray(quizItems?.questions)?quizItems.questions:[]);
+    const savedAnswers=work.draft.quiz_answers||{};
+
+    return `<span class="eyebrow">Ön hazırlık · Quiz</span>
+        <h2>Ön Hazırlık Quizi</h2>
+        <p class="intro">Vaka çalışmasına başlamadan önce ders kaynaklarını inceleyip bu soruları yanıtlayınız. Yanıtlarınız otomatik olarak kaydedilir.</p>
+        ${quizList.length?`
+            <div class="quiz-questions-list">
+                ${quizList.map((q,idx)=>{
+                    const currentAnswer=savedAnswers[q.id]??savedAnswers[idx]??'';
+                    return `
+                        <div class="card quiz-card" data-quiz-item="${esc(q.id||idx)}" style="margin-bottom:16px;">
+                            <h3 style="margin-top:0;"><strong>Soru ${idx+1}:</strong> ${esc(q.question)}</h3>
+                            <div class="quiz-options-group" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+                                ${q.options.map((opt)=>`
+                                    <label class="quiz-option-label" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border,#ccc);border-radius:6px;cursor:pointer;background:${currentAnswer===opt?'var(--selected-bg,#e8f0fe)':'transparent'}">
+                                        <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
+                                        <span>${esc(opt)}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                            ${q.explanation&&currentAnswer?`<div class="quiz-explanation muted" style="margin-top:10px;padding:8px 12px;background:var(--subtle-bg,#f8f9fa);border-radius:4px;"><small><b>Açıklama:</b> ${esc(q.explanation)}</small></div>`:''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div class="row spaced" style="margin-top:20px;">
+                <button type="button" id="save-quiz-btn">Quiz Yanıtlarını Kaydet & Tamamla</button>
+            </div>
+        `:'<div class="empty">Bu vaka için tanımlanmış quiz sorusu bulunmuyor.</div>'}`;
+}
+
+function studentTabHtml(key,label,index,initialLock){
+    const shortNames={materials:'Kaynaklar',quiz:'Quiz',case:'Vaka',profile:'Profil',initial:names.initial,ai:'AI sohbeti',final:names.final,reflection:'Yansıtma',confirm:'Son teslim'};
+    const isClosed=isCollectionClosed()&&work.application.state!=='submitted';
+    const state=sectionLocked(key)?(isClosed&&!['materials','quiz'].includes(key)?'Veri toplama kapalı':'Kilitli'):(initialLock&&['profile','initial'].includes(key))||locked()?'Salt okunur':'';
+    const accessible=`${index+1}. ${label}${state?' · '+state:''}`;
+    return `<button data-section="${key}" class="${section===key?'active':''}" aria-current="${section===key?'step':'false'}" aria-label="${esc(accessible)}" title="${esc(accessible)}"><span class="student-tab-number" aria-hidden="true">${index+1}</span><span class="student-tab-copy"><span class="student-tab-label">${shortNames[key]}</span>${state?`<span class="student-tab-state ${state==='Kilitli'||state==='Veri toplama kapalı'?'is-locked':'is-readonly'}" aria-hidden="true">${state==='Kilitli'||state==='Veri toplama kapalı'?'🔒 Kilitli':'Salt okunur'}</span>`:''}</span></button>`;
+}
+function renderWork(){destroyForums();if(typeof VakaEditor!=='undefined')VakaEditor.destroyAll();destroyChatView();const a=work.application,d=work.draft,initialLock=!!a.initial_at||locked();if(a.state!=='submitted')d.response_mode='forum';$('#root').innerHTML=`<div class="student-work-heading"><div class="toolbar"><div><div class="eyebrow">Vaka çalışma alanı · sürüm ${work.version.version} · Deneme ${a.attempt_no}</div><h1>${esc(a.case_title||'Pedagojik vaka')}</h1></div><div class="row"><span class="pill">${esc(stateName(a.state))}</span><span id="save-status" class="status">${dirty?'Kaydedilmemiş değişiklik var':'Sunucudaki sürüm yüklendi'}</span><button id="back" class="secondary">${me.preview_app_id?'← Yönetim paneli':'← Vakalarım'}</button>${stepControls()}</div></div>${work.attempts?.length>1?`<div class="row" aria-label="Vaka denemeleri">${work.attempts.map(t=>`<button class="secondary" data-student-attempt="${t.id}" ${t.id===a.id?'disabled':''}>Deneme ${t.attempt_no} · ${esc(stateName(t.state))}</button>`).join('')}</div>`:''}</div><div class="workspace-top"><nav class="tabs" aria-label="Çalışma bölümleri">${Object.entries(names).map(([k,v],i)=>studentTabHtml(k,v,i,initialLock)).join('')}</nav></div><div class="section">${a.collection_closed_at&&!Number(a.allow_late)?'<p class="warning">Bu vakada veri toplama henüz açılmadı veya kapalı. Ön hazırlık ve ders kaynaklarını inceleyebilirsiniz.</p>':''}${readOnlyTab?'<p class="warning">Bu vaka başka sekmede açık. Bu sekme salt okunur. Diğer sekmeyi kapattıktan 20 saniye sonra yeniden yükleyin.</p>':''}${conflict?'<p class="warning">Sürüm çakışması: taslağı kopyalayıp sunucu sürümünü yeniden yükleyin.</p>':''}${section==='confirm'?'<div id="validation-summary" class="validation-summary" role="alert" hidden></div>':''}<div class="card" id="section-body"></div>${section==='confirm'?reportLinks():''}</div>`;
+    let html='';
+    if(sectionLocked(section)){
+        if(isCollectionClosed()&&work.application.state!=='submitted'){
+            html='<span class="eyebrow">Veri toplama henüz açılmadı</span><h2>Ön hazırlık aşaması</h2><p class="prose">Bu vaka için veri toplama süreci henüz başlatılmamıştır. Lütfen önce <b>Ders kaynakları</b> ve <b>Ön hazırlık quizi</b> adımlarını tamamlayınız.</p><p class="muted">Öğretmeniniz / araştırmacı veri toplamayı başlattığında vaka metni ve sonraki aşamalar erişiminize açılacaktır.</p>';
+        }else{
+            html='<h2>Bu bölüm henüz açık değil</h2><p>Genel Tartışma Forumu (Önce) aşamasını tamamladığınızda AI sohbeti, nihai değerlendirme, yansıtma ve son teslim bölümleri açılacaktır.</p>';
+        }
+    }
+    else if(section==='materials')html=renderMaterialsSection();
+    else if(section==='quiz')html=renderQuizSection();
     else if(section==='case')html=`<span class="eyebrow">Vaka metni · sürüm ${work.version.version}</span><h2>Durumu inceleyin</h2><div class="prose" data-source="case">${esc(work.version.body)}</div><p class="prose">${esc(work.version.instructions)}</p>`;
     else if(section==='profile')html=`<span class="eyebrow">Başlangıç profili</span><h2>Bu vakaya ilişkin görüşünüz</h2><p class="muted">Her alan başlangıçta boştur. Profiliniz (Önce) tartışmasını tamamladığınızda kesinleşir.</p><div class="grid">${[['knowledge','Ön bilgi: Bu konu hakkında ne kadar bilginiz var?'],['confidence','Başlangıç güveni: Uygun karar verebileceğinize ne kadar güveniyorsunuz?'],['difficulty','Algılanan zorluk'],['severity','Yanlış kararın sonucunun ciddiyeti']].map(([k,l])=>`<div>${numberField(k,l,d[k],initialLock)}</div>`).join('')}</div>`;
     else if(section==='initial')html=`<section id="case-forum"></section><button class="spaced" id="initial" ${initialLock?'disabled':''}>Tartışmayı tamamla ve AI sohbetini aç</button>`;
@@ -107,6 +213,37 @@ function renderWork(){destroyForums();if(typeof VakaEditor!=='undefined')VakaEdi
     if(section==='ai'&&!sectionLocked(section))html+=`<div id="chat-failures">${VakaChat.failures(work.requests,locked()||busy)}</div>`;
     $('#section-body').innerHTML=html;bindFields(['knowledge','confidence','difficulty','severity','problem','decision','reason','question','final_decision','final_reason','final_confidence','final_difficulty','final_severity','reflection']);
     mountStudentEditors();
+    if(section==='materials'){
+        const v5=$('#study-html5-video');
+        if(v5){
+            v5.onplay=()=>event('video_play',{time:v5.currentTime,url:v5.currentSrc});
+            v5.onpause=()=>event('video_pause',{time:v5.currentTime,url:v5.currentSrc});
+            v5.onended=()=>event('video_ended',{time:v5.currentTime,url:v5.currentSrc});
+        }
+        document.querySelectorAll('[data-track-material]').forEach(btn=>{
+            btn.onclick=()=>{
+                trackMaterialClick(btn.dataset.trackMaterial,btn.dataset.title,btn.dataset.url);
+            };
+        });
+        handler('#go-to-quiz',()=>navigateWork('quiz'));
+    }else if(section==='quiz'){
+        event('quiz_view',{});
+        document.querySelectorAll('[data-quiz-answer-input]').forEach(radio=>{
+            radio.onchange=()=>{
+                const qid=radio.dataset.qid,idx=Number(radio.dataset.idx),val=radio.value;
+                work.draft.quiz_answers=work.draft.quiz_answers||{};
+                work.draft.quiz_answers[qid]=val;
+                event('quiz_answer',{question_id:qid,question_index:idx,answer:val});
+                scheduleSave();
+                renderWork();
+            };
+        });
+        handler('#save-quiz-btn',async()=>{
+            await save('save');
+            event('quiz_submit',{answered_count:Object.keys(work.draft.quiz_answers||{}).length});
+            notify('Quiz yanıtlarınız başarıyla kaydedildi.');
+        });
+    }
     const forumHost=$('#case-forum');if(forumHost&&typeof VakaForum!=='undefined'){const phase=section==='initial'?'before':'after',target=work;forumViews.push(VakaForum.mount(forumHost,{api,appId:target.application.id,phase,userId:me.id,confirm:confirmStudent,readOnly:()=>work!==target||locked(),onInteraction:(type,payload,throttle=false)=>{if(work===target){lastInput=Date.now();event(type,payload,throttle);}},onState:data=>{if(work!==target)return;if(Number.isInteger(data.own_post_count)){target.forum_participation??={};target.forum_participation[phase]=data.own_post_count;updateValidationFeedback();}},onPost:post=>{if(work!==target)return;target.forum_participation??={};target.forum_participation[phase]=(target.forum_participation[phase]||0)+1;updateValidationFeedback();event('forum_posted',{phase,post_id:post.id,parent_id:post.parent_id});}}));}
     document.querySelectorAll('[data-section]').forEach(b=>{b.onpointerdown=e=>{if(dirty&&e.button===0)e.preventDefault();};b.onclick=()=>navigateWork(b.dataset.section).catch(e=>notify(e.message));});
     for(const [id,direction] of [['work-previous',-1],['work-next',1]]){const button=$('#'+id);button.onpointerdown=e=>{if(dirty&&e.button===0)e.preventDefault();};handler('#'+id,()=>advanceWork(direction));}
