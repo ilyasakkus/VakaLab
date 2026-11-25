@@ -26,7 +26,14 @@ final class App {
     }
     public function view(array $u,string $id): array {
         $a=$this->access($u,$id);$v=$this->db->one('SELECT * FROM case_versions WHERE id=?',[$a['version_id']]);
-        $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions'],'materials'=>$v['materials']??'{}','quiz'=>$v['quiz']??'[]'], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
+        if($a['state']!=='submitted'){
+            $current=$this->db->one('SELECT v.materials,v.quiz FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.id=?',[$a['case_id']]);
+            if($current){
+                if($current['materials']!==null&&$current['materials']!=='')$v['materials']=$current['materials'];
+                if($current['quiz']!==null&&$current['quiz']!=='')$v['quiz']=$current['quiz'];
+            }
+        }
+        $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions'],'materials'=>$v['materials']?:'{}','quiz'=>$v['quiz']?:'[]'], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
         $result['forum_participation']=['before'=>0,'after'=>0];foreach($this->db->all('SELECT f.phase,COUNT(*) n FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id WHERE p.app_id=? GROUP BY f.phase',[$id]) as $count)$result['forum_participation'][$count['phase']]=(int)$count['n'];
         if($u['role']==='researcher'){
             foreach(['events','draft_revisions','ai_requests','analysis_runs','reports','research_notes'] as $t)$result[$t]=$this->db->all('SELECT * FROM '.$t.' WHERE app_id=?'.($t==='analysis_runs'?' ORDER BY created_at,id':''),[$id]);

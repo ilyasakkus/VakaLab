@@ -115,17 +115,25 @@ function trackMaterialClick(id,title,url){
     flushEvents();
 }
 
+function safeExternalUrl(raw){
+    const s=String(raw||'').trim();
+    if(!s)return '';
+    if(/^[a-z][a-z0-9+.-]*:/i.test(s))return /^https?:/i.test(s)?s:'';
+    return 'https://'+s;
+}
+
 function renderMaterialsSection(){
-    const mats=typeof work.version.materials==='string'?processObject(work.version.materials):(work.version.materials||{});
+    const mats=(typeof work.version.materials==='string'?processObject(work.version.materials):work.version.materials)||{};
     const videoUrl=(mats.video_url||'').trim();
+    const safeVideoUrl=safeExternalUrl(videoUrl);
     const videoTitle=(mats.video_title||'').trim()||'Ders Konu Anlatım Videosu';
     const videoDesc=(mats.video_desc||'').trim();
     const items=Array.isArray(mats.items)?mats.items:[];
 
     let embedHtml='';
-    if(videoUrl){
-        const ytMatch=videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-        const vimeoMatch=videoUrl.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/i);
+    if(safeVideoUrl){
+        const ytMatch=safeVideoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+        const vimeoMatch=safeVideoUrl.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/i);
 
         if(ytMatch){
             const videoId=ytMatch[1];
@@ -134,7 +142,7 @@ function renderMaterialsSection(){
             const vimeoId=vimeoMatch[3];
             embedHtml=`<div class="video-container"><iframe id="study-video-iframe" src="https://player.vimeo.com/video/${vimeoId}" title="${esc(videoTitle)}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>`;
         }else{
-            embedHtml=`<div class="video-container"><video id="study-html5-video" controls style="width:100%;max-height:480px;border-radius:8px;background:#000;"><source src="${esc(videoUrl)}">Tarayıcınız video etiketini desteklemiyor.</video></div>`;
+            embedHtml=`<div class="video-container"><video id="study-html5-video" controls style="width:100%;max-height:480px;border-radius:8px;background:#000;"><source src="${esc(safeVideoUrl)}">Tarayıcınız video etiketini desteklemiyor.</video></div><p class="muted" style="margin-top:-12px;margin-bottom:20px;"><a href="${esc(safeVideoUrl)}" target="_blank" rel="noopener noreferrer" data-track-material="video_external" data-title="${esc(videoTitle)}" data-url="${esc(safeVideoUrl)}">Videoyu yeni sekmede aç ↗</a></p>`;
         }
     }
 
@@ -146,15 +154,15 @@ function renderMaterialsSection(){
         <div class="materials-links-section" style="margin-top:28px;">
             <h3>Ek Ders Materyalleri & Kaynaklar</h3>
             ${items.length?`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:12px;">
-                ${items.map(item=>`
+                ${items.map(item=>{const href=safeExternalUrl(item.url);return `
                     <article class="card material-item-card">
                         <h4>${esc(item.title||'Ders Materyali')}</h4>
                         ${item.desc?`<p class="muted">${esc(item.desc)}</p>`:''}
-                        <a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="material-link-btn" data-track-material="${esc(item.id)}" data-title="${esc(item.title||'Materyal')}" data-url="${esc(item.url)}" style="display:inline-block;margin-top:8px;padding:8px 14px;background:var(--accent,#0056b3);color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">
+                        ${href?`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" class="material-link-btn" data-track-material="${esc(item.id)}" data-title="${esc(item.title||'Materyal')}" data-url="${esc(href)}" style="display:inline-block;margin-top:8px;padding:8px 14px;background:var(--accent,#0056b3);color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">
                             Kaynağı Aç / İncele ↗
-                        </a>
+                        </a>`:'<span class="muted">Geçerli bağlantı eklenmemiş.</span>'}
                     </article>
-                `).join('')}
+                `;}).join('')}
             </div>`:'<p class="muted">Ek ders materyali bulunmuyor.</p>'}
         </div>
         <div class="row spaced" style="margin-top:24px;">
@@ -164,9 +172,10 @@ function renderMaterialsSection(){
 
 function renderQuizSection(){
     const rawQuiz=work.version.quiz;
-    const quizItems=Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]);
+    const quizItems=(Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]))||[];
     const quizList=Array.isArray(quizItems)?quizItems:(Array.isArray(quizItems?.questions)?quizItems.questions:[]);
     const savedAnswers=work.draft.quiz_answers||{};
+    const isLocked=locked();
 
     return `<span class="eyebrow">Ön hazırlık · Quiz</span>
         <h2>Ön Hazırlık Quizi</h2>
@@ -175,13 +184,14 @@ function renderQuizSection(){
             <div class="quiz-questions-list">
                 ${quizList.map((q,idx)=>{
                     const currentAnswer=savedAnswers[q.id]??savedAnswers[idx]??'';
+                    const opts=Array.isArray(q.options)?q.options:[];
                     return `
                         <div class="card quiz-card" data-quiz-item="${esc(q.id||idx)}" style="margin-bottom:16px;">
                             <h3 style="margin-top:0;"><strong>Soru ${idx+1}:</strong> ${esc(q.question)}</h3>
                             <div class="quiz-options-group" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
-                                ${q.options.map((opt)=>`
+                                ${opts.map((opt)=>`
                                     <label class="quiz-option-label" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border,#ccc);border-radius:6px;cursor:pointer;background:${currentAnswer===opt?'var(--selected-bg,#e8f0fe)':'transparent'}">
-                                        <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
+                                        <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} ${isLocked?'disabled':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
                                         <span>${esc(opt)}</span>
                                     </label>
                                 `).join('')}
@@ -192,7 +202,7 @@ function renderQuizSection(){
                 }).join('')}
             </div>
             <div class="row spaced" style="margin-top:20px;">
-                <button type="button" id="save-quiz-btn">Quiz Yanıtlarını Kaydet & Tamamla</button>
+                <button type="button" id="save-quiz-btn" ${isLocked?'disabled':''}>Quiz Yanıtlarını Kaydet & Tamamla</button>
             </div>
         `:'<div class="empty">Bu vaka için tanımlanmış quiz sorusu bulunmuyor.</div>'}`;
 }

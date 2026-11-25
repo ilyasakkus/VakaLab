@@ -15,7 +15,7 @@ final class Preview {
             $userId=uid();$copyId=uid();$versionId=uid();$appId=uid();
             $db->insert('users',['id'=>$userId,'login'=>'PREVIEW-'.$userId,'name'=>'Öğrenci önizlemesi','password'=>password_hash(uid(),PASSWORD_DEFAULT),'role'=>'student','status'=>'active','owner_id'=>$userId,'metadata'=>js(['preview_owner'=>$researcher['id'],'source_case'=>$caseId]),'test'=>1,'created_at'=>now()]);
             $db->insert('cases',['id'=>$copyId,'owner_id'=>$userId,'title'=>$case['title'],'position'=>$case['position'],'status'=>'active','practice'=>1,'test'=>1,'stop_access'=>0,'current_version'=>$versionId]);
-            $db->insert('case_versions',['id'=>$versionId,'case_id'=>$copyId,'version'=>$version['version'],'body'=>$version['body'],'instructions'=>$version['instructions'],'notes'=>'','created_at'=>now()]);
+            $db->insert('case_versions',['id'=>$versionId,'case_id'=>$copyId,'version'=>$version['version'],'body'=>$version['body'],'instructions'=>$version['instructions'],'notes'=>'','materials'=>$version['materials']??'{}','quiz'=>$version['quiz']??'[]','created_at'=>now()]);
             Forum::ensure($db,$copyId);
             $db->insert('assignments',['id'=>uid(),'user_id'=>$userId,'case_id'=>$copyId,'active'=>1]);
             $db->insert('applications',['id'=>$appId,'user_id'=>$userId,'case_id'=>$copyId,'version_id'=>$versionId,'state'=>'initial','revision'=>0,'draft'=>js(Rules::draft([])),'excluded'=>1,'exclusion_reason'=>'Yönetici öğrenci önizlemesi','created_at'=>now()]);
