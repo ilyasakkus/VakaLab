@@ -26,12 +26,10 @@ final class App {
     }
     public function view(array $u,string $id): array {
         $a=$this->access($u,$id);$v=$this->db->one('SELECT * FROM case_versions WHERE id=?',[$a['version_id']]);
-        if($a['state']!=='submitted'){
-            $current=$this->db->one('SELECT v.materials,v.quiz FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.id=?',[$a['case_id']]);
-            if($current){
-                if($current['materials']!==null&&$current['materials']!=='')$v['materials']=$current['materials'];
-                if($current['quiz']!==null&&$current['quiz']!=='')$v['quiz']=$current['quiz'];
-            }
+        $current=$this->db->one('SELECT v.materials,v.quiz FROM cases c JOIN case_versions v ON v.id=c.current_version WHERE c.id=?',[$a['case_id']]);
+        if($current){
+            if(($a['state']!=='submitted'||empty($v['materials'])||$v['materials']==='{}')&&!empty($current['materials']))$v['materials']=$current['materials'];
+            if(($a['state']!=='submitted'||empty($v['quiz'])||$v['quiz']==='[]')&&!empty($current['quiz']))$v['quiz']=$current['quiz'];
         }
         $result=['application'=>$a,'version'=>['id'=>$v['id'],'version'=>$v['version'],'body'=>$v['body'],'instructions'=>$v['instructions'],'materials'=>$v['materials']?:'{}','quiz'=>$v['quiz']?:'[]'], 'messages'=>$this->db->all('SELECT id,seq,role,content,status,created_at FROM messages WHERE app_id=? ORDER BY seq',[$id]),'snapshots'=>$this->db->all('SELECT * FROM snapshots WHERE app_id=?',[$id])];
         $result['forum_participation']=['before'=>0,'after'=>0];foreach($this->db->all('SELECT f.phase,COUNT(*) n FROM forum_posts p JOIN case_forums f ON f.id=p.forum_id WHERE p.app_id=? GROUP BY f.phase',[$id]) as $count)$result['forum_participation'][$count['phase']]=(int)$count['n'];
@@ -61,6 +59,9 @@ final class App {
             demand($a['state']!=='submitted','Teslim edilmiş çalışma değişmez',409);
             demand((int)($p['revision']??-1)===(int)$a['revision'],'Sürüm çakışması. Metninizi kopyalayın ve yeniden yükleyin.',409);
             $d=Rules::draft($p['draft']??[]);$old=obj($a['draft']);
+            if(!empty($old['quiz_completed_at'])){
+                demand(($d['quiz_answers']??[])===($old['quiz_answers']??[])&&($d['quiz_completed_at']??'')===$old['quiz_completed_at'],'Quiz yanıtları tamamlandı ve kilitlendi; değiştirilemez',409);
+            }
             if(Scope::collectionClosed($this->access($u,$id))){
                 demand($action==='save','Bu vakada veri toplama kapalı',409);
                 foreach(['knowledge','confidence','difficulty','severity','problem','decision','reason','final_decision','final_reason','reflection','question','final_confidence','final_difficulty','final_severity'] as $k){

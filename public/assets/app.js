@@ -75,6 +75,7 @@ async function openWork(id){work=await api('view',undefined,{app_id:id});viewId=
 }
 function isCollectionClosed(){return !!(work?.application?.collection_closed_at&&!Number(work.application.allow_late));}
 function locked(){return work.application.state==='submitted'||(isCollectionClosed()&&section!=='materials'&&section!=='quiz')||readOnlyTab||conflict;}
+function quizLocked(){return locked()||!!work?.draft?.quiz_completed_at;}
 function sectionLocked(s){
     if(s==='materials'||s==='quiz')return false;
     if(isCollectionClosed()&&work.application.state!=='submitted')return true;
@@ -108,7 +109,8 @@ function mountStudentEditors(){
 
 const materialClickCounts=new Map();
 function trackMaterialClick(id,title,url){
-    const key=work?work.application.id+':'+id:id;
+    if(!work||work.application.state==='submitted')return;
+    const key=work.application.id+':'+id;
     const count=(materialClickCounts.get(key)||0)+1;
     materialClickCounts.set(key,count);
     event('material_click',{id,title,url,click_count:count});
@@ -129,6 +131,7 @@ function renderMaterialsSection(){
     const videoTitle=(mats.video_title||'').trim()||'Ders Konu Anlatım Videosu';
     const videoDesc=(mats.video_desc||'').trim();
     const items=Array.isArray(mats.items)?mats.items:[];
+    const isSubmitted=work.application.state==='submitted';
 
     let embedHtml='';
     if(safeVideoUrl){
@@ -148,6 +151,7 @@ function renderMaterialsSection(){
 
     return `<span class="eyebrow">Ön hazırlık · Ders kaynakları</span>
         <h2>${esc(videoTitle)}</h2>
+        ${isSubmitted?'<p class="muted">Bu vaka teslim edilmiştir. Ders kaynaklarını ve videoyu salt okunur olarak inceleyebilirsiniz (teslim sonrası tıklama ve izleme kaydı tutulmaz).</p>':''}
         ${videoDesc?`<div class="prose" style="margin-bottom:16px;">${esc(videoDesc)}</div>`:''}
         ${embedHtml?embedHtml:'<div class="empty">Bu vaka için video bağlantısı eklenmemiştir.</div>'}
         
@@ -175,11 +179,12 @@ function renderQuizSection(){
     const quizItems=(Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]))||[];
     const quizList=Array.isArray(quizItems)?quizItems:(Array.isArray(quizItems?.questions)?quizItems.questions:[]);
     const savedAnswers=work.draft.quiz_answers||{};
-    const isLocked=locked();
+    const isQuizLocked=quizLocked();
 
     return `<span class="eyebrow">Ön hazırlık · Quiz</span>
         <h2>Ön Hazırlık Quizi</h2>
-        <p class="intro">Vaka çalışmasına başlamadan önce ders kaynaklarını inceleyip bu soruları yanıtlayınız. Yanıtlarınız otomatik olarak kaydedilir.</p>
+        <p class="intro">${isQuizLocked?'Quiz yanıtlarınız kilitlenmiştir. Kayıtlı yanıtlarınızı aşağıda görüntüleyebilirsiniz.':'Vaka çalışmasına başlamadan önce ders kaynaklarını inceleyip bu soruları yanıtlayınız. Tamamladığınızda yanıtlarınız kilitlenir.'}</p>
+        ${work.draft.quiz_completed_at?`<p class="process-ok">Quiz tamamlandı ve kilitlendi (${displayTime(work.draft.quiz_completed_at)}). Yanıtlarınız salt okunur olarak gösterilmektedir.</p>`:work.application.state==='submitted'?'<p class="muted">Bu vaka teslim edildiği için quiz salt okunur görünümündedir.</p>':''}
         ${quizList.length?`
             <div class="quiz-questions-list">
                 ${quizList.map((q,idx)=>{
@@ -191,18 +196,19 @@ function renderQuizSection(){
                             <div class="quiz-options-group" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
                                 ${opts.map((opt)=>`
                                     <label class="quiz-option-label ${currentAnswer===opt?'is-selected':''}">
-                                        <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} ${isLocked?'disabled':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
+                                        <input type="radio" name="quiz_q_${idx}" value="${esc(opt)}" ${currentAnswer===opt?'checked':''} ${isQuizLocked?'disabled':''} data-quiz-answer-input data-qid="${esc(q.id||idx)}" data-idx="${idx}">
                                         <span>${esc(opt)}</span>
                                     </label>
                                 `).join('')}
                             </div>
-                            ${q.explanation&&currentAnswer?`<div class="quiz-explanation muted" style="margin-top:10px;padding:8px 12px;background:var(--subtle-bg,#f8f9fa);border-radius:4px;"><small><b>Açıklama:</b> ${esc(q.explanation)}</small></div>`:''}
+                            ${q.explanation&&(isQuizLocked||currentAnswer)?`<div class="quiz-explanation muted" style="margin-top:10px;padding:8px 12px;background:var(--subtle-bg,#f8f9fa);border-radius:4px;"><small><b>Açıklama:</b> ${esc(q.explanation)}</small></div>`:''}
                         </div>
                     `;
                 }).join('')}
             </div>
             <div class="row spaced" style="margin-top:20px;">
-                <button type="button" id="save-quiz-btn" ${isLocked?'disabled':''}>Quiz Yanıtlarını Kaydet & Tamamla</button>
+                <button type="button" id="save-quiz-btn" ${isQuizLocked?'disabled':''}>${work.draft.quiz_completed_at?'Quiz Tamamlandı (Kilitli)':'Quiz Yanıtlarını Kaydet & Tamamla'}</button>
+                ${isQuizLocked&&!sectionLocked('case')?'<button type="button" class="secondary" id="go-to-case">Vaka Metnine Geç →</button>':''}
             </div>
         `:'<div class="empty">Bu vaka için tanımlanmış quiz sorusu bulunmuyor.</div>'}`;
 }
@@ -210,7 +216,8 @@ function renderQuizSection(){
 function studentTabHtml(key,label,index,initialLock){
     const shortNames={materials:'Kaynaklar',quiz:'Quiz',case:'Vaka',profile:'Profil',initial:'Forum (Önce)',ai:'AI sohbeti',final:'Forum (Sonra)',reflection:'Yansıtma',confirm:'Son teslim'};
     const isClosed=isCollectionClosed()&&work.application.state!=='submitted';
-    const state=sectionLocked(key)?(isClosed&&!['materials','quiz'].includes(key)?'Veri toplama kapalı':'Kilitli'):(initialLock&&['profile','initial'].includes(key))||locked()?'Salt okunur':'';
+    const isReadOnly=(initialLock&&['profile','initial'].includes(key))||(key==='quiz'&&quizLocked())||locked();
+    const state=sectionLocked(key)?(isClosed&&!['materials','quiz'].includes(key)?'Veri toplama kapalı':'Kilitli'):isReadOnly?'Salt okunur':'';
     const accessible=`${index+1}. ${label}${state?' · '+state:''}`;
     return `<button data-section="${key}" class="${section===key?'active':''}" aria-current="${section===key?'step':'false'}" aria-label="${esc(accessible)}" title="${esc(accessible)}"><span class="student-tab-number" aria-hidden="true">${index+1}</span><span class="student-tab-copy"><span class="student-tab-label">${shortNames[key]}</span>${state?`<span class="student-tab-state ${state==='Kilitli'||state==='Veri toplama kapalı'?'is-locked':'is-readonly'}" aria-hidden="true">${state==='Kilitli'||state==='Veri toplama kapalı'?'🔒 Kilitli':'Salt okunur'}</span>`:''}</span></button>`;
 }
@@ -236,35 +243,58 @@ function renderWork(){destroyForums();if(typeof VakaEditor!=='undefined')VakaEdi
     $('#section-body').innerHTML=html;bindFields(['knowledge','confidence','difficulty','severity','problem','decision','reason','question','final_decision','final_reason','final_confidence','final_difficulty','final_severity','reflection']);
     mountStudentEditors();
     if(section==='materials'){
-        const v5=$('#study-html5-video');
-        if(v5){
-            v5.onplay=()=>event('video_play',{time:v5.currentTime,url:v5.currentSrc});
-            v5.onpause=()=>event('video_pause',{time:v5.currentTime,url:v5.currentSrc});
-            v5.onended=()=>event('video_ended',{time:v5.currentTime,url:v5.currentSrc});
+        if(work.application.state!=='submitted'){
+            const v5=$('#study-html5-video');
+            if(v5){
+                v5.onplay=()=>event('video_play',{time:v5.currentTime,url:v5.currentSrc});
+                v5.onpause=()=>event('video_pause',{time:v5.currentTime,url:v5.currentSrc});
+                v5.onended=()=>event('video_ended',{time:v5.currentTime,url:v5.currentSrc});
+            }
+            document.querySelectorAll('[data-track-material]').forEach(btn=>{
+                btn.onclick=()=>{
+                    trackMaterialClick(btn.dataset.trackMaterial,btn.dataset.title,btn.dataset.url);
+                };
+            });
         }
-        document.querySelectorAll('[data-track-material]').forEach(btn=>{
-            btn.onclick=()=>{
-                trackMaterialClick(btn.dataset.trackMaterial,btn.dataset.title,btn.dataset.url);
-            };
-        });
         handler('#go-to-quiz',()=>navigateWork('quiz'));
     }else if(section==='quiz'){
-        event('quiz_view',{});
-        document.querySelectorAll('[data-quiz-answer-input]').forEach(radio=>{
-            radio.onchange=()=>{
-                const qid=radio.dataset.qid,idx=Number(radio.dataset.idx),val=radio.value;
-                work.draft.quiz_answers=work.draft.quiz_answers||{};
-                work.draft.quiz_answers[qid]=val;
-                event('quiz_answer',{question_id:qid,question_index:idx,answer:val});
-                scheduleSave();
+        if(work.application.state!=='submitted')event('quiz_view',{});
+        handler('#go-to-case',()=>navigateWork('case'));
+        if(!quizLocked()){
+            document.querySelectorAll('[data-quiz-answer-input]').forEach(radio=>{
+                radio.onchange=()=>{
+                    if(quizLocked())return;
+                    const qid=radio.dataset.qid,idx=Number(radio.dataset.idx),val=radio.value;
+                    work.draft.quiz_answers=work.draft.quiz_answers||{};
+                    work.draft.quiz_answers[qid]=val;
+                    event('quiz_answer',{question_id:qid,question_index:idx,answer:val});
+                    scheduleSave();
+                    renderWork();
+                };
+            });
+            handler('#save-quiz-btn',async()=>{
+                if(quizLocked())return;
+                const rawQuiz=work.version.quiz;
+                const quizItems=(Array.isArray(rawQuiz)?rawQuiz:(typeof rawQuiz==='string'?processObject(rawQuiz):[]))||[];
+                const quizList=Array.isArray(quizItems)?quizItems:(Array.isArray(quizItems?.questions)?quizItems.questions:[]);
+                const savedAnswers=work.draft.quiz_answers||{};
+                const missingIdx=quizList.findIndex((q,idx)=>{const ans=savedAnswers[q.id]??savedAnswers[idx];return ans===undefined||ans===null||String(ans).trim()==='';});
+                if(missingIdx!==-1){
+                    notify(`Quiz'i tamamlamak ve kilitlemek için lütfen tüm soruları yanıtlayın (Soru ${missingIdx+1} boş).`);
+                    const card=document.querySelectorAll('[data-quiz-item]')[missingIdx];
+                    card?.scrollIntoView({behavior:'smooth',block:'center'});
+                    return;
+                }
+                if(!(await confirmStudent('Quiz yanıtlarınız kaydedilecek ve kilitlenecektir. Onayladıktan sonra yanıtlarınızı görebilir ancak değiştiremezsiniz. Tamamlansın mı?')))return;
+                work.draft.quiz_completed_at=new Date().toISOString();
+                dirty=true;
+                await save('save');
+                event('quiz_submit',{answered_count:Object.keys(work.draft.quiz_answers||{}).length});
+                await flushEvents();
                 renderWork();
-            };
-        });
-        handler('#save-quiz-btn',async()=>{
-            await save('save');
-            event('quiz_submit',{answered_count:Object.keys(work.draft.quiz_answers||{}).length});
-            notify('Quiz yanıtlarınız başarıyla kaydedildi.');
-        });
+                notify('Quiz yanıtlarınız başarıyla kaydedildi ve kilitlendi.');
+            });
+        }
     }
     const forumHost=$('#case-forum');if(forumHost&&typeof VakaForum!=='undefined'){const phase=section==='initial'?'before':'after',target=work;forumViews.push(VakaForum.mount(forumHost,{api,appId:target.application.id,phase,userId:me.id,confirm:confirmStudent,readOnly:()=>work!==target||locked(),onInteraction:(type,payload,throttle=false)=>{if(work===target){lastInput=Date.now();event(type,payload,throttle);}},onState:data=>{if(work!==target)return;if(Number.isInteger(data.own_post_count)){target.forum_participation??={};target.forum_participation[phase]=data.own_post_count;updateValidationFeedback();}},onPost:post=>{if(work!==target)return;target.forum_participation??={};target.forum_participation[phase]=(target.forum_participation[phase]||0)+1;updateValidationFeedback();event('forum_posted',{phase,post_id:post.id,parent_id:post.parent_id});}}));}
     document.querySelectorAll('[data-section]').forEach(b=>{b.onpointerdown=e=>{if(dirty&&e.button===0)e.preventDefault();};b.onclick=()=>navigateWork(b.dataset.section).catch(e=>notify(e.message));});

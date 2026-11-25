@@ -88,6 +88,7 @@ function processMaterialsQuizHtml(v){
             <h3>Ek Ders Materyalleri Tıklama Kayıtları</h3>
             ${clickRows.length?`<div class="table-wrap"><table><thead><tr><th>Materyal / Bağlantı</th><th>Tıklama Sayısı</th><th>Son Tıklama Zamanı</th></tr></thead><tbody>${clickRows.map(m=>`<tr><td><b>${esc(m.title)}</b>${m.url?`<br><small><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.url)}</a></small>`:''}</td><td>${m.count} kez</td><td>${displayTime(m.lastAt)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Öğrenci henüz ek ders materyallerine tıklamadı.</p>'}
             <h3>Ön Hazırlık Quizi Yanıtları</h3>
+            <p class="muted">Durum: <b>${draft.quiz_completed_at?'Tamamlandı ve kilitlendi':'Henüz tamamlanmadı / taslak'}</b>${draft.quiz_completed_at?' · '+displayTime(draft.quiz_completed_at):''}</p>
             ${quizList.length?`<div class="table-wrap"><table><thead><tr><th>Soru</th><th>Öğrencinin Yanıtı</th><th>Doğru Cevap</th><th>Durum</th></tr></thead><tbody>${quizList.map((q,idx)=>{
                 const ans=quizAnswers[q.id]??quizAnswers[idx];
                 const hasAnswer=ans!==undefined&&ans!==null&&ans!=='';

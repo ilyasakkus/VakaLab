@@ -16,6 +16,9 @@ final class Rules {
             }
             $out['quiz_answers']=$cleanQuiz;
         }
+        if(!empty($d['quiz_completed_at'])&&is_string($d['quiz_completed_at'])&&strlen($d['quiz_completed_at'])<=64){
+            $out['quiz_completed_at']=$d['quiz_completed_at'];
+        }
         if(array_key_exists('rich_text',$d)){demand(is_array($d['rich_text']),'Editör verisi geçersiz');$rich=RichText::normalize($d['rich_text'],$out);if($rich)$out['rich_text']=$rich;}
         return $out;
     }
